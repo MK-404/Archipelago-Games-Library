@@ -2,21 +2,19 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
-const XLSX = require('xlsx');
 
 // Configuration
 const CONFIG = {
-    STEAMGRIDDB_API_KEY: 'f6c46127673a65d708ec019a7737d108',
-    XLSX_FILE: '../Archipelago Games Sheet.xlsx',
-    SHEET_NAMES: ['Core-Verified Worlds', 'Playable Worlds'],
-    OUTPUT_DIR: '../data',
-    COVERS_DIR: '../data/covers',
-    BANNERS_DIR: '../data/banners',
-    OUTPUT_JSON: '../data/games.json',
-    HISTORY_JSON: '../data/game-history.json',
+    STEAMGRIDDB_API_KEY: process.env.STEAMGRIDDB_API_KEY || '',
+    CORE_VERIFIED_HTML: path.join(__dirname, '../extract/Core-Verified Worlds.html'),
+    PLAYABLE_WORLDS_HTML: path.join(__dirname, '../extract/Playable Worlds.html'),
+    OUTPUT_DIR: path.join(__dirname, '../data'),
+    COVERS_DIR: path.join(__dirname, '../data/covers'),
+    BANNERS_DIR: path.join(__dirname, '../data/banners'),
+    OUTPUT_JSON: path.join(__dirname, '../data/games.json'),
+    HISTORY_JSON: path.join(__dirname, '../data/game-history.json'),
     BATCH_SIZE: 10, // Process 10 games in parallel
     DELAY_BETWEEN_BATCHES: 1000, // 1 second delay between batches
-    NEW_GAME_DAYS: 30, // Games added in last 30 days are marked as NEW
 };
 
 // Platform detection removed - not needed
@@ -65,120 +63,166 @@ function saveGameHistory(history) {
 // Update game history with new games
 function updateGameHistory(games, history) {
     const now = new Date().toISOString();
-    let newGamesCount = 0;
+    const newGameNames = new Set();
 
-    // First pass: identify truly new games
-    const newGames = [];
+    // Add new games to history
     games.forEach(game => {
         if (!history[game.name]) {
-            newGames.push(game);
+            history[game.name] = {
+                addedDate: now,
+                firstSeen: now
+            };
+            newGameNames.add(game.name);
         }
     });
 
-    // Second pass: if there are new games, remove isNew from all existing games
-    if (newGames.length > 0) {
-        Object.keys(history).forEach(gameName => {
-            if (history[gameName].isNew) {
-                delete history[gameName].isNew;
-            }
-        });
-
-        // Add new games with isNew flag
-        newGames.forEach(game => {
-            history[game.name] = {
-                addedDate: now,
-                firstSeen: now,
-                isNew: true  // Mark as new only on first appearance
-            };
-            newGamesCount++;
-        });
-    }
-    // If no new games, keep existing isNew flags unchanged
-
-    return newGamesCount;
+    return { newGamesCount: newGameNames.size, newGameNames };
 }
 
-// Parse XLSX sheet
-function parseSheet(sheet, sheetName) {
-    console.log(`\nParsing sheet: ${sheetName}`);
+// Parse HTML table rows
+function parseHTMLTable(html) {
+    const rows = [];
+    const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    let trMatch;
 
-    // Convert sheet to array of arrays (no headers)
-    const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-    const games = [];
+    while ((trMatch = trRegex.exec(html)) !== null) {
+        const rowContent = trMatch[1];
+        const cells = [];
+        const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+        let tdMatch;
 
-    const isPlayableWorlds = sheetName === 'Playable Worlds';
-    const isCoreVerified = sheetName === 'Core-Verified Worlds';
+        while ((tdMatch = tdRegex.exec(rowContent)) !== null) {
+            const cellContent = tdMatch[1];
+            const links = [];
+            const aRegex = /<a[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+            let aMatch;
 
-    console.log(`  Type: ${sheetName}`);
-    console.log(`  Rows: ${data.length}`);
-
-    // Parse each row
-    for (const row of data) {
-        // Get game name from first column (index 0)
-        const gameName = (row[0] || '').toString().trim();
-
-        // Skip metadata rows and empty rows
-        if (gameName &&
-            !gameName.toLowerCase().includes('please') &&
-            !gameName.toLowerCase().includes('headers') &&
-            !gameName.toLowerCase().includes('if something') &&
-            !gameName.toLowerCase().includes('this is a duplication') &&
-            gameName.length > 1) {
-
-            const game = {
-                name: gameName,
-                coverPath: null,
-                bannerPath: null
-            };
-
-            // Parse columns based on sheet type
-            if (isPlayableWorlds) {
-                // Playable Worlds: Column 0 = Game, Column 1 = Status, Column 2 = Source, Column 3 = Notes
-                game.status = (row[1] || '').toString();
-                game.source = (row[2] || '').toString();
-                game.notes = (row[3] || '').toString();
-                game.type = 'Playable';
-            } else if (isCoreVerified) {
-                // Core-Verified: Column 0 = Game, Column 1 = Game Page, Column 2 = Setup Page, Column 3 = Discord Channel
-                game.gamePage = (row[1] || '').toString();
-                game.setupPage = (row[2] || '').toString();
-                game.discordChannel = (row[3] || '').toString();
-                game.status = 'Core-Verified';
-                game.type = 'Core-Verified';
+            while ((aMatch = aRegex.exec(cellContent)) !== null) {
+                links.push({
+                    text: aMatch[2].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim(),
+                    url: aMatch[1]
+                });
             }
 
-            games.push(game);
+            let text = cellContent
+                .replace(/<br\s*\/?>/gi, '\n') // Preserve line breaks
+                .replace(/<[^>]+>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/ +/g, ' ') // Multiple spaces to single space
+                .trim();
+
+            cells.push({ text, links });
+        }
+
+        if (cells.length > 0) {
+            rows.push(cells);
         }
     }
 
-    console.log(`  Found ${games.length} games`);
+    return rows;
+}
+
+// Parse Core-Verified Worlds HTML
+function parseCoreVerified(filePath) {
+    console.log(`\nParsing: ${filePath}`);
+    const html = fs.readFileSync(filePath, 'utf-8');
+    const rows = parseHTMLTable(html);
+    const games = [];
+
+    for (const row of rows) {
+        if (row.length >= 4) {
+            const name = row[0].text;
+
+            if (!name || name === 'Game' ||
+                name.toLowerCase().includes('please') ||
+                name.toLowerCase().includes('headers') ||
+                name.toLowerCase().includes('if something') ||
+                name.toLowerCase().includes('do not sort') ||
+                name.toLowerCase().includes('this is a duplication') ||
+                name.length <= 1) {
+                continue;
+            }
+
+            games.push({
+                name: name,
+                gamePage: row[1].links.length > 0 ? row[1].links[0].url : '',
+                setupGuide: row[2].links.length > 0 ? row[2].links[0].url : '',
+                discordChannel: row[3].links.length > 0 ? row[3].links[0].url : '',
+                status: 'Core-Verified',
+                type: 'Core-Verified',
+                coverPath: null,
+                bannerPath: null
+            });
+        }
+    }
+
+    console.log(`  Found ${games.length} Core-Verified games`);
     return games;
 }
 
-// Parse XLSX file
-function parseXLSX(filePath) {
-    console.log(`\nReading XLSX file: ${filePath}`);
+// Parse Playable Worlds HTML
+function parsePlayableWorlds(filePath) {
+    console.log(`\nParsing: ${filePath}`);
+    const html = fs.readFileSync(filePath, 'utf-8');
+    const rows = parseHTMLTable(html);
+    const games = [];
 
-    if (!fs.existsSync(filePath)) {
-        throw new Error(`File not found: ${filePath}`);
-    }
+    for (const row of rows) {
+        if (row.length >= 4) {
+            const name = row[0].text;
 
-    const workbook = XLSX.readFile(filePath);
-    let allGames = [];
+            if (!name || name === 'Game' ||
+                name.toLowerCase().includes('please') ||
+                name.toLowerCase().includes('headers') ||
+                name.toLowerCase().includes('if something') ||
+                name.toLowerCase().includes('do not sort') ||
+                name.toLowerCase().includes('this is a duplication') ||
+                name.length <= 1) {
+                continue;
+            }
 
-    // Parse each specified sheet
-    for (const sheetName of CONFIG.SHEET_NAMES) {
-        if (workbook.SheetNames.includes(sheetName)) {
-            const sheet = workbook.Sheets[sheetName];
-            const games = parseSheet(sheet, sheetName);
-            allGames = allGames.concat(games);
-        } else {
-            console.log(`⚠ Warning: Sheet "${sheetName}" not found in workbook`);
-            console.log(`  Available sheets: ${workbook.SheetNames.join(', ')}`);
+            games.push({
+                name: name,
+                status: row[1].text,
+                source: {
+                    text: row[2].text,
+                    links: row[2].links
+                },
+                notes: {
+                    text: row[3].text,
+                    links: row[3].links
+                },
+                type: 'Playable',
+                coverPath: null,
+                bannerPath: null
+            });
         }
     }
 
-    return allGames;
+    console.log(`  Found ${games.length} Playable Worlds games`);
+    return games;
+}
+
+// Parse HTML files
+function parseHTML() {
+    console.log('\n=== Parsing HTML Files ===');
+
+    if (!fs.existsSync(CONFIG.CORE_VERIFIED_HTML)) {
+        throw new Error(`File not found: ${CONFIG.CORE_VERIFIED_HTML}`);
+    }
+    if (!fs.existsSync(CONFIG.PLAYABLE_WORLDS_HTML)) {
+        throw new Error(`File not found: ${CONFIG.PLAYABLE_WORLDS_HTML}`);
+    }
+
+    const coreVerified = parseCoreVerified(CONFIG.CORE_VERIFIED_HTML);
+    const playableWorlds = parsePlayableWorlds(CONFIG.PLAYABLE_WORLDS_HTML);
+
+    return [...coreVerified, ...playableWorlds];
 }
 
 // Fetch from SteamGridDB
@@ -224,7 +268,7 @@ function downloadImage(url, filepath) {
                 resolve();
             });
         }).on('error', (err) => {
-            fs.unlink(filepath, () => {});
+            fs.unlink(filepath, () => { });
             reject(err);
         });
     });
@@ -388,12 +432,12 @@ async function fetchGameCover(game) {
 
 // Main build function
 async function build() {
-    console.log('=== Archipelago Games Viewer - Build Script ===\n');
+    console.log('=== Archipelago Games Library - Build Script ===\n');
 
     ensureDirectories();
 
-    // Parse XLSX file
-    const allGames = parseXLSX(CONFIG.XLSX_FILE);
+    // Parse HTML files
+    const allGames = parseHTML();
 
     // Remove duplicates
     const uniqueGames = [...new Map(allGames.map(g => [g.name, g])).values()];
@@ -405,7 +449,7 @@ async function build() {
     // Load and update game history
     console.log('\n=== Updating Game History ===\n');
     const gameHistory = loadGameHistory();
-    const newGamesCount = updateGameHistory(uniqueGames, gameHistory);
+    const { newGamesCount, newGameNames } = updateGameHistory(uniqueGames, gameHistory);
 
     if (newGamesCount > 0) {
         console.log(`✓ Found ${newGamesCount} new game(s) added to the library!`);
@@ -413,11 +457,15 @@ async function build() {
         console.log(`✓ No new games detected`);
     }
 
-    // Add addedDate and isNew flag to each game
+    // Add addedDate and calculate isNew based on date (last 30 days)
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
     uniqueGames.forEach(game => {
         if (gameHistory[game.name]) {
             game.addedDate = gameHistory[game.name].addedDate;
-            game.isNew = gameHistory[game.name].isNew || false;
+            const addedDate = new Date(gameHistory[game.name].addedDate);
+            game.isNew = addedDate >= oneMonthAgo;
         }
     });
 
@@ -431,8 +479,8 @@ async function build() {
     const defaultCoverPath = 'data/covers/_default.png';
     const hasDefaultCover = fs.existsSync(defaultCoverPath);
 
-    // First, check which games already have covers
-    const gamesWithCovers = [];
+    // First, assign existing covers to ALL games
+    // Only NEW games without covers will be downloaded
     const gamesMissingCovers = [];
 
     for (const game of uniqueGames) {
@@ -440,22 +488,21 @@ async function build() {
         if (existingCover) {
             // Has specific cover
             game.coverPath = existingCover;
-            gamesWithCovers.push(game);
-        } else if (hasDefaultCover) {
-            // No specific cover, but default exists - use it directly
-            game.coverPath = defaultCoverPath;
-            gamesWithCovers.push(game);
-        } else {
-            // No specific cover and no default - needs download attempt
+        } else if (newGameNames.has(game.name)) {
+            // New game without cover - needs download
             gamesMissingCovers.push(game);
+        } else {
+            // Old game without specific cover - use default
+            if (hasDefaultCover) {
+                game.coverPath = defaultCoverPath;
+            }
         }
     }
 
-    console.log(`✓ Found ${gamesWithCovers.length} games with existing covers (including default)`);
-    console.log(`⚠ Need to download ${gamesMissingCovers.length} covers\n`);
+    console.log(`⚠ Need to download ${gamesMissingCovers.length} covers for NEW games\n`);
 
     // Now fetch missing covers in parallel batches
-    let successCount = gamesWithCovers.length; // Start with existing covers
+    let successCount = 0;
     let failCount = 0;
 
     if (gamesMissingCovers.length > 0) {
@@ -523,8 +570,8 @@ async function build() {
     // Fetch banners
     console.log('\n=== Checking Existing Banners ===\n');
 
-    // First, check which games already have banners
-    const gamesWithBanners = [];
+    // First, assign existing banners to ALL games
+    // Only NEW games without banners will be downloaded
     const gamesMissingBanners = [];
     const defaultBannerPath = 'data/banners/_default.png';
     const hasDefaultBanner = fs.existsSync(defaultBannerPath);
@@ -534,22 +581,21 @@ async function build() {
         if (existingBanner) {
             // Has specific banner
             game.bannerPath = existingBanner;
-            gamesWithBanners.push(game);
-        } else if (hasDefaultBanner) {
-            // No specific banner, but default exists - use it directly
-            game.bannerPath = defaultBannerPath;
-            gamesWithBanners.push(game);
-        } else {
-            // No specific banner and no default - needs download attempt
+        } else if (newGameNames.has(game.name)) {
+            // New game without banner - needs download
             gamesMissingBanners.push(game);
+        } else {
+            // Old game without specific banner - use default
+            if (hasDefaultBanner) {
+                game.bannerPath = defaultBannerPath;
+            }
         }
     }
 
-    console.log(`✓ Found ${gamesWithBanners.length} games with existing banners (including default)`);
-    console.log(`⚠ Need to download ${gamesMissingBanners.length} banners\n`);
+    console.log(`⚠ Need to download ${gamesMissingBanners.length} banners for NEW games\n`);
 
     // Now fetch missing banners in parallel batches
-    let bannersSuccessCount = gamesWithBanners.length;
+    let bannersSuccessCount = 0;
     let bannersFailCount = 0;
 
     if (gamesMissingBanners.length > 0) {

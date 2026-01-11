@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         await loadGamesData();
     } catch (error) {
-        showError('Errore nel caricamento dei dati: ' + error.message);
+        showError('Error loading data: ' + error.message);
         console.error(error);
     }
 
@@ -46,12 +46,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Load pre-built games data
 async function loadGamesData() {
-    showLoading('Caricamento giochi...');
+    showLoading('Loading games...');
 
     try {
         const response = await fetch('data/games.json');
         if (!response.ok) {
-            throw new Error('Impossibile caricare i dati dei giochi');
+            throw new Error('Unable to load game data');
         }
 
         const data = await response.json();
@@ -139,8 +139,26 @@ function sortGames(games, sortOption) {
                     return priorityA - priorityB;
                 }
 
-                // Se stesso status, ordina alfabeticamente
+                // If same status, sort alphabetically
                 return a.name.localeCompare(b.name);
+            });
+            break;
+
+        case 'date-newest':
+            // Sort by date, newest first
+            sorted.sort((a, b) => {
+                const dateA = a.addedDate ? new Date(a.addedDate) : new Date(0);
+                const dateB = b.addedDate ? new Date(b.addedDate) : new Date(0);
+                return dateB - dateA; // Descending (newest first)
+            });
+            break;
+
+        case 'date-oldest':
+            // Sort by date, oldest first
+            sorted.sort((a, b) => {
+                const dateA = a.addedDate ? new Date(a.addedDate) : new Date(0);
+                const dateB = b.addedDate ? new Date(b.addedDate) : new Date(0);
+                return dateA - dateB; // Ascending (oldest first)
             });
             break;
     }
@@ -153,7 +171,7 @@ function renderGames() {
     gamesGrid.innerHTML = '';
 
     if (displayedGames.length === 0) {
-        gamesGrid.innerHTML = '<div class="loading-message">Nessun gioco trovato</div>';
+        gamesGrid.innerHTML = '<div class="loading-message">No games found</div>';
         return;
     }
 
@@ -246,7 +264,7 @@ function handleSearch() {
     const query = normalizeText(searchInput.value.trim());
     const sortValue = sortSelect.value;
 
-    // Filter games
+    // Filter games by search query
     let filtered = allGames.filter(game => {
         const normalizedName = normalizeText(game.name);
         return !query || normalizedName.includes(query);
@@ -262,7 +280,7 @@ function handleSearch() {
 // Update game count
 function updateGameCount() {
     const count = displayedGames.length;
-    gameCount.textContent = `${count} ${count === 1 ? 'gioco' : 'giochi'}`;
+    gameCount.textContent = `${count} ${count === 1 ? 'game' : 'games'}`;
 }
 
 // UI helpers
@@ -290,8 +308,20 @@ function escapeHtml(text) {
 
 // Modal Functions
 
-// Parse links from source or other fields
-function parseLinks(game) {
+// Get icon based on URL
+function getIconForUrl(url) {
+    if (url.includes('github.com')) {
+        return '<img src="icons/github-logo.png" class="button-icon" alt="GitHub">';
+    } else if (url.includes('discord.com')) {
+        return '<img src="icons/discord-logo.png" class="button-icon" alt="Discord">';
+    } else if (url.includes('archipelago.gg')) {
+        return '<img src="icons/archipelago-logo.png" class="button-icon" alt="Archipelago">';
+    }
+    return '🔗'; // Default link icon (fallback)
+}
+
+// Parse download links from source field (Column C)
+function parseDownloadLinks(game) {
     const links = [];
 
     // Add game page link if it exists (Core-Verified games)
@@ -310,31 +340,175 @@ function parseLinks(game) {
         });
     }
 
-    // Parse source field for links (Playable games)
-    if (game.source && game.source.trim()) {
-        const sourceText = game.source.trim();
+    // Add Discord channel link if it exists (Core-Verified games)
+    if (game.discordChannel && game.discordChannel.trim()) {
+        links.push({
+            label: 'Discord Channel',
+            url: game.discordChannel.trim()
+        });
+    }
 
-        // Try to extract URLs from the source field
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
-        const matches = sourceText.match(urlRegex);
+    // Parse source field for download links (Playable games - Column C)
+    if (game.source) {
+        // New structure: source is an object with text and links array
+        if (typeof game.source === 'object' && game.source.links) {
+            const sourceText = game.source.text || '';
 
-        if (matches) {
-            matches.forEach((url, index) => {
+            game.source.links.forEach((link, index) => {
+                let label = 'Download';
+
+                // If link text is descriptive (not just the URL), use it as label
+                const linkText = link.text || '';
+                const isJustUrl = linkText === link.url || linkText.trim() === link.url || linkText.startsWith('http');
+
+                if (!isJustUrl && linkText.length > 0) {
+                    // Use the full descriptive text as label
+                    label = linkText;
+                } else {
+                    // Link text is just URL, try to infer from context
+                    const urlIndex = sourceText.indexOf(link.url);
+                    if (urlIndex > 0) {
+                        // Get text before the URL
+                        const beforeText = sourceText.substring(Math.max(0, urlIndex - 20), urlIndex).trim();
+                        const beforeLower = beforeText.toLowerCase();
+
+                        // Check if it's in "APWorld:" or "Client:" format
+                        if (beforeLower.endsWith('apworld:') || beforeLower.endsWith('apworld')) {
+                            label = 'APWorld';
+                        } else if (beforeLower.endsWith('client:') || beforeLower.endsWith('client')) {
+                            label = 'Client';
+                        } else if (game.source.links.length > 1) {
+                            label = `Download ${index + 1}`;
+                        }
+                    } else if (game.source.links.length > 1) {
+                        label = `Download ${index + 1}`;
+                    }
+                }
+
                 links.push({
-                    label: `Source ${index + 1}`,
-                    url: url
+                    label: label,
+                    url: link.url
                 });
             });
-        } else if (sourceText) {
-            // If no URL found but there's text, show it as a link anyway
-            links.push({
-                label: 'Source',
-                url: sourceText
-            });
+        }
+        // Old structure: source is a string (backward compatibility)
+        else if (typeof game.source === 'string' && game.source.trim()) {
+            const sourceText = game.source.trim();
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const matches = sourceText.match(urlRegex);
+
+            if (matches) {
+                matches.forEach((url, index) => {
+                    links.push({
+                        label: matches.length > 1 ? `Download ${index + 1}` : 'Download',
+                        url: url
+                    });
+                });
+            }
         }
     }
 
     return links;
+}
+
+// Convert notes text with links to HTML (Column D)
+function formatNotesWithLinks(game) {
+    if (!game.notes) return '';
+
+    let notesText = '';
+    let notesLinks = [];
+
+    // Extract text and links from notes
+    if (typeof game.notes === 'object') {
+        notesText = game.notes.text || '';
+        notesLinks = game.notes.links || [];
+    } else if (typeof game.notes === 'string') {
+        notesText = game.notes;
+    }
+
+    if (!notesText.trim()) return '';
+
+    // Replace URLs in text with clickable links
+    let formattedText = notesText;
+
+    // For each link, find the label before it in the text
+    notesLinks.forEach(link => {
+        let urlIndex = formattedText.indexOf(link.url);
+
+        // If URL is not in the text, try to find the link text
+        if (urlIndex === -1 && link.text && link.text !== link.url) {
+            // The link text might be part of the notes text
+            const linkTextIndex = formattedText.indexOf(link.text);
+            if (linkTextIndex !== -1) {
+                // Replace the link text with a clickable link
+                const clickableLink = `<a href="${link.url}" target="_blank" rel="noopener noreferrer" class="note-link" title="${link.url}">${link.text}</a>`;
+                formattedText = formattedText.replace(link.text, clickableLink);
+                return; // Done with this link
+            }
+        }
+
+        if (urlIndex !== -1) {
+            // Get text around the URL to find the label
+            const beforeUrl = formattedText.substring(Math.max(0, urlIndex - 100), urlIndex);
+
+            // Find the last occurrence of common patterns before the URL
+            // Pattern 1: "Label: " (with colon)
+            // Pattern 2: Text after last newline (for cases like "text\nSetup Guide here")
+            // Pattern 3: "Label " (without colon, just space)
+            const patterns = [
+                /([^.!?\n]+):\s*$/,           // "Setup instructions: "
+                /\n([^\n]+)\s*$/,              // "\nSetup Guide found here"
+                /([^.!?\n]+)\s+$/,             // "Some text "
+                /^(.+)$/                       // Fallback to all text
+            ];
+            let linkLabel = 'Link';
+            let labelToRemove = '';
+            let replaceWithNewline = false;
+
+            for (const pattern of patterns) {
+                const match = beforeUrl.match(pattern);
+                if (match && match[1].trim().length > 0 && match[1].trim().length < 50) {
+                    linkLabel = match[1].trim();
+                    // Check if the pattern ends with ":" to remove it along with the label
+                    if (pattern === patterns[0]) { // Pattern with colon
+                        labelToRemove = match[0]; // Include the colon and whitespace
+                    } else if (pattern === patterns[1]) { // Pattern after newline
+                        labelToRemove = match[1]; // Text after newline (preserve any whitespace)
+                        replaceWithNewline = true; // Keep the newline before the link
+                    }
+                    break;
+                }
+            }
+
+            // Create the clickable link
+            const clickableLink = `<a href="${link.url}" target="_blank" rel="noopener noreferrer" class="note-link" title="${link.url}">${linkLabel}</a>`;
+
+            // If we found a label to remove
+            if (labelToRemove) {
+                if (replaceWithNewline) {
+                    // For newline pattern, replace "text url" with "\nlink" (preserve newline)
+                    // Find and replace "Setup Guide found here[URL]" with "\n[link]"
+                    const textToReplace = labelToRemove + link.url;
+                    const escapedText = textToReplace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const replacePattern = new RegExp(escapedText, 'g');
+                    formattedText = formattedText.replace(replacePattern, '\n' + clickableLink);
+                } else {
+                    // For colon pattern, replace "label: url" with "link"
+                    const labelAndUrl = labelToRemove + link.url;
+                    formattedText = formattedText.replace(labelAndUrl, clickableLink);
+                }
+            } else {
+                // Otherwise just replace the URL
+                const urlPattern = new RegExp(link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+                formattedText = formattedText.replace(urlPattern, clickableLink);
+            }
+        }
+    });
+
+    // Convert newlines to <br> tags
+    formattedText = formattedText.replace(/\n/g, '<br>');
+
+    return formattedText;
 }
 
 
@@ -379,18 +553,23 @@ async function openGameModal(game) {
         modalBanner.classList.add('no-banner');
     }
 
-    // Parse and display links
-    const links = parseLinks(game);
+    // Parse and display download links (Column C only)
+    const downloadLinks = parseDownloadLinks(game);
 
-    if (links.length > 0) {
+    if (downloadLinks.length > 0) {
         modalLinks.innerHTML = '';
-        links.forEach(link => {
+        downloadLinks.forEach(link => {
             const linkElement = document.createElement('a');
             linkElement.className = 'modal-link';
             linkElement.href = link.url;
             linkElement.target = '_blank';
             linkElement.rel = 'noopener noreferrer';
-            linkElement.textContent = `${link.label}: ${link.url}`;
+
+            // Add icon and label
+            const icon = getIconForUrl(link.url);
+            linkElement.innerHTML = `${icon} ${link.label}`;
+            linkElement.title = link.url; // Show URL on hover
+
             modalLinks.appendChild(linkElement);
         });
         modalLinksSection.style.display = 'block';
@@ -398,9 +577,11 @@ async function openGameModal(game) {
         modalLinksSection.style.display = 'none';
     }
 
-    // Display notes
-    if (game.notes && game.notes.trim()) {
-        modalNotes.textContent = game.notes.trim();
+    // Display notes with inline clickable links (Column D)
+    const formattedNotes = formatNotesWithLinks(game);
+
+    if (formattedNotes) {
+        modalNotes.innerHTML = formattedNotes; // Use innerHTML to render links
         modalNotesSection.style.display = 'block';
     } else {
         modalNotesSection.style.display = 'none';

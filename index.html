@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -14,23 +14,37 @@
 <body>
     <div class="container">
         <header>
-            <h1>Archipelago Games Library</h1>
+            <div class="header-top">
+                <h1>Archipelago Games Library</h1>
+                <div class="discord-links">
+                    <a href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer" class="discord-button" title="Discord Archipelago">
+                        <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
+                        Discord
+                    </a>
+                    <a href="https://discord.gg/rY64GAVs2U" target="_blank" rel="noopener noreferrer" class="discord-button after-dark" title="Discord After Dark (+18)">
+                        <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
+                        After Dark
+                    </a>
+                </div>
+            </div>
             <div class="controls">
-                <input type="text" id="searchInput" placeholder="Cerca giochi..." />
+                <input type="text" id="searchInput" placeholder="Search games..." />
                 <select id="sortSelect">
-                    <option value="default">Predefinito</option>
+                    <option value="default">Default</option>
                     <option value="alpha-asc">A → Z</option>
                     <option value="alpha-desc">Z → A</option>
-                    <option value="status">Per stato</option>
+                    <option value="status">By Status</option>
+                    <option value="date-newest">Newest First</option>
+                    <option value="date-oldest">Oldest First</option>
                 </select>
                 <div class="stats">
-                    <span id="gameCount">0 giochi</span>
+                    <span id="gameCount">0 games</span>
                 </div>
             </div>
         </header>
 
         <div id="loadingMessage" class="loading-message">
-            Caricamento dati...
+            Loading data...
         </div>
 
         <div id="errorMessage" class="error-message" style="display: none;"></div>
@@ -51,12 +65,12 @@
                 <div id="modalStatus" class="modal-status"></div>
 
                 <div id="modalLinksSection" class="modal-section" style="display: none;">
-                    <h3 class="modal-section-title">Links</h3>
+                    <h3 class="modal-section-title">Downloads</h3>
                     <div id="modalLinks" class="modal-links"></div>
                 </div>
 
                 <div id="modalNotesSection" class="modal-section" style="display: none;">
-                    <h3 class="modal-section-title">Note</h3>
+                    <h3 class="modal-section-title">Notes</h3>
                     <div id="modalNotes" class="modal-notes"></div>
                 </div>
             </div>

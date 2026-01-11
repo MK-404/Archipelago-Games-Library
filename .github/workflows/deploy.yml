@@ -28,15 +28,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Run build script
         run: npm run build
         env:
           NODE_ENV: production
+          STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
