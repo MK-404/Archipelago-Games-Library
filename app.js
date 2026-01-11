@@ -3,6 +3,7 @@
 // State
 let allGames = [];
 let displayedGames = [];
+let showAdultContent = false;
 
 // DOM Elements
 const searchInput = document.getElementById('searchInput');
@@ -23,8 +24,38 @@ const modalLinks = document.getElementById('modalLinks');
 const modalNotesSection = document.getElementById('modalNotesSection');
 const modalNotes = document.getElementById('modalNotes');
 
+// Age Verification Elements
+const adultContentToggle = document.getElementById('adultContentToggle');
+const ageVerificationModal = document.getElementById('ageVerificationModal');
+const ageConfirmYes = document.getElementById('ageConfirmYes');
+const ageConfirmNo = document.getElementById('ageConfirmNo');
+
+// After Dark Discord button
+const afterDarkButton = document.querySelector('.discord-button.after-dark');
+
+// Update After Dark button visibility
+function updateAfterDarkButton() {
+    if (afterDarkButton) {
+        if (showAdultContent) {
+            afterDarkButton.classList.remove('hidden');
+        } else {
+            afterDarkButton.classList.add('hidden');
+        }
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    // Load adult content preference from localStorage
+    const savedPreference = localStorage.getItem('showAdultContent');
+    if (savedPreference === 'true') {
+        showAdultContent = true;
+        adultContentToggle.checked = true;
+    }
+
+    // Update After Dark button visibility on load
+    updateAfterDarkButton();
+
     try {
         await loadGamesData();
     } catch (error) {
@@ -34,6 +65,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     searchInput.addEventListener('input', handleSearch);
     sortSelect.addEventListener('change', handleSearch);
+
+    // Adult content toggle event listener
+    adultContentToggle.addEventListener('change', handleAdultToggle);
+
+    // Age verification modal event listeners
+    ageConfirmYes.addEventListener('click', confirmAge);
+    ageConfirmNo.addEventListener('click', denyAge);
+    ageVerificationModal.addEventListener('click', (e) => {
+        if (e.target === ageVerificationModal) {
+            denyAge(); // Close and turn off if clicking outside
+        }
+    });
 
     // Modal event listeners
     modalClose.addEventListener('click', closeModal);
@@ -74,6 +117,62 @@ async function loadGamesData() {
 // Check if game is new (added in last build)
 function isGameNew(game) {
     return game.isNew === true;
+}
+
+// Check if game is After Dark (+18)
+function isAfterDark(game) {
+    if (!game.notes) return false;
+
+    const notesText = typeof game.notes === 'object' ? (game.notes.text || '') : game.notes;
+    return notesText.toLowerCase().includes('after dark');
+}
+
+// Handle adult content toggle
+function handleAdultToggle() {
+    if (adultContentToggle.checked) {
+        // User wants to enable adult content - show verification modal
+        if (!showAdultContent) {
+            openAgeVerificationModal();
+        }
+    } else {
+        // User wants to disable adult content
+        showAdultContent = false;
+        localStorage.setItem('showAdultContent', 'false');
+        updateAfterDarkButton();
+        handleSearch(); // Refresh display
+    }
+}
+
+// Open age verification modal
+function openAgeVerificationModal() {
+    ageVerificationModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+// Close age verification modal
+function closeAgeVerificationModal() {
+    ageVerificationModal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Confirm age (Yes button)
+function confirmAge() {
+    showAdultContent = true;
+    localStorage.setItem('showAdultContent', 'true');
+    adultContentToggle.checked = true;
+    updateAfterDarkButton();
+    closeAgeVerificationModal();
+    handleSearch(); // Refresh display to show adult games
+}
+
+// Deny age (No button)
+function denyAge() {
+    showAdultContent = false;
+    localStorage.setItem('showAdultContent', 'false');
+    adultContentToggle.checked = false;
+    updateAfterDarkButton();
+    closeAgeVerificationModal();
+    handleSearch(); // Refresh display to hide adult games
 }
 
 // Get status priority for sorting
@@ -264,10 +363,17 @@ function handleSearch() {
     const query = normalizeText(searchInput.value.trim());
     const sortValue = sortSelect.value;
 
-    // Filter games by search query
+    // Filter games by search query and adult content preference
     let filtered = allGames.filter(game => {
         const normalizedName = normalizeText(game.name);
-        return !query || normalizedName.includes(query);
+        const matchesSearch = !query || normalizedName.includes(query);
+
+        // Filter out After Dark games if adult content is disabled
+        if (!showAdultContent && isAfterDark(game)) {
+            return false;
+        }
+
+        return matchesSearch;
     });
 
     // Sort games

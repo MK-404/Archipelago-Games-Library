@@ -37,6 +37,13 @@
                     <option value="date-newest">Newest First</option>
                     <option value="date-oldest">Oldest First</option>
                 </select>
+                <div class="adult-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="adultContentToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label">Show +18</span>
+                </div>
                 <div class="stats">
                     <span id="gameCount">0 games</span>
                 </div>
@@ -51,6 +58,22 @@
 
         <div id="gamesGrid" class="games-grid">
             <!-- Game cards will be inserted here -->
+        </div>
+    </div>
+
+    <!-- Age Verification Modal -->
+    <div id="ageVerificationModal" class="modal-overlay age-verification">
+        <div class="modal-content age-modal">
+            <h2 class="age-modal-title">Age Verification Required</h2>
+            <p class="age-modal-text">
+                By enabling this option, you confirm that you are of legal age in your jurisdiction.
+                Games published in After Dark may contain sensitive content including violence, blood,
+                or sexual themes.
+            </p>
+            <div class="age-modal-buttons">
+                <button id="ageConfirmYes" class="age-button age-yes">Yes, I am of legal age</button>
+                <button id="ageConfirmNo" class="age-button age-no">No, I am not</button>
+            </div>
         </div>
     </div>
 
