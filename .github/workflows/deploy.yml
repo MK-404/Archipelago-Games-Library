@@ -7,7 +7,7 @@ on:
   workflow_dispatch: # Allow manual trigger
 
 permissions:
-  contents: read
+  contents: write  # Changed to write to allow commits
   pages: write
   id-token: write
 
@@ -34,6 +34,16 @@ jobs:
         env:
           NODE_ENV: production
           STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
+
+      - name: Commit updated files
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update game history and new covers/banners"
+          file_pattern: "data/game-history.json data/covers/* data/banners/*"
+          commit_user_name: "GitHub Actions Bot"
+          commit_user_email: "actions@github.com"
+          commit_author: "GitHub Actions Bot <actions@github.com>"
+          skip_dirty_check: false
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
