@@ -18,11 +18,13 @@
             <div class="header-top">
                 <h1>Archipelago Games Library</h1>
                 <div class="discord-links">
-                    <a href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer" class="discord-button" title="Discord Archipelago">
+                    <a href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer"
+                        class="discord-button" title="Discord Archipelago">
                         <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
                         Discord
                     </a>
-                    <a href="https://discord.gg/rY64GAVs2U" target="_blank" rel="noopener noreferrer" class="discord-button after-dark" title="Discord After Dark (+18)">
+                    <a href="https://discord.gg/rY64GAVs2U" target="_blank" rel="noopener noreferrer"
+                        class="discord-button after-dark" title="Discord After Dark (+18)">
                         <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
                         After Dark
                     </a>
@@ -110,7 +112,7 @@
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-        import { getDatabase, ref, onValue, onDisconnect, set, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+        import { getDatabase, ref, onValue, set, remove, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 
         // Firebase configuration
         const firebaseConfig = {
@@ -129,30 +131,58 @@
             app = initializeApp(firebaseConfig);
             database = getDatabase(app);
 
-            // Generate unique user ID for this session
-            const userId = 'user_' + Math.random().toString(36).substr(2, 9);
+            // Get or create persistent user ID from localStorage
+            let userId = localStorage.getItem('archipelago_user_id');
+            if (!userId) {
+                userId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+                localStorage.setItem('archipelago_user_id', userId);
+            }
             const userRef = ref(database, `users/${userId}`);
             const usersRef = ref(database, 'users');
 
-            // Set user as online
-            set(userRef, {
-                online: true,
-                timestamp: serverTimestamp()
+            // BroadcastChannel for cross-tab communication
+            const channel = new BroadcastChannel('archipelago_presence');
+
+            // Register user as online
+            function registerUser() {
+                set(userRef, {
+                    online: true,
+                    timestamp: serverTimestamp()
+                });
+            }
+
+            // Initial registration
+            registerUser();
+
+            // Listen for messages from other tabs
+            channel.addEventListener('message', (event) => {
+                if (event.data.type === 'ping' && event.data.userId === userId) {
+                    // Another tab with same userId is checking if we're alive
+                    // Respond and re-register
+                    channel.postMessage({ type: 'pong', userId: userId });
+                    registerUser();
+                }
             });
 
-            // Remove user on disconnect
-            onDisconnect(userRef).remove();
+            // When tab is closing
+            window.addEventListener('beforeunload', () => {
+                // Remove user from Firebase
+                remove(userRef);
+
+                // Ask other tabs if they have the same userId
+                channel.postMessage({ type: 'ping', userId: userId });
+            });
 
             // Listen to online users count
             onValue(usersRef, (snapshot) => {
                 const data = snapshot.val();
-                const count = data ? Object.keys(data).length : 0;
-                document.getElementById('onlineCount').textContent = count;
-            });
+                if (!data) {
+                    document.getElementById('onlineCount').textContent = '0';
+                    return;
+                }
 
-            // Clean up on page unload
-            window.addEventListener('beforeunload', () => {
-                set(userRef, null);
+                const userCount = Object.keys(data).length;
+                document.getElementById('onlineCount').textContent = userCount;
             });
         } catch (error) {
             console.warn('Firebase not configured:', error.message);
