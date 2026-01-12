@@ -218,10 +218,58 @@ h1 {
 }
 
 .stats {
+    display: flex;
+    align-items: center;
+    gap: 20px;
     padding: 10px 20px;
     background: var(--bg-card);
     border-radius: 3px;
     font-weight: 600;
+}
+
+/* Online Counter */
+.online-counter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.online-dot {
+    width: 10px;
+    height: 10px;
+    background: #4caf50;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.8;
+    }
+}
+
+#onlineCount {
+    color: #4caf50;
+    font-weight: 600;
+    font-size: 1.1em;
+    min-width: 20px;
+    text-align: center;
+}
+
+.online-label {
+    color: var(--text-secondary);
+    font-size: 0.9em;
 }
 
 .loading-message, .error-message {

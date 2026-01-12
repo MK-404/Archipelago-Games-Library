@@ -46,6 +46,11 @@
                     <span class="toggle-label">Show +18</span>
                 </div>
                 <div class="stats">
+                    <div class="online-counter">
+                        <span class="online-dot"></span>
+                        <span id="onlineCount">0</span>
+                        <span class="online-label">online</span>
+                    </div>
                     <span id="gameCount">0 games</span>
                 </div>
             </div>
@@ -101,6 +106,61 @@
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, onValue, onDisconnect, set, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCx61otmpsts6xwQoeDqs_Nv6tv70ncdxE",
+            authDomain: "archipelago-games-library.firebaseapp.com",
+            databaseURL: "https://archipelago-games-library-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "archipelago-games-library",
+            storageBucket: "archipelago-games-library.firebasestorage.app",
+            messagingSenderId: "209146086324",
+            appId: "1:209146086324:web:6935953023edad7eda28e1"
+        };
+
+        // Initialize Firebase
+        let app, database;
+        try {
+            app = initializeApp(firebaseConfig);
+            database = getDatabase(app);
+
+            // Generate unique user ID for this session
+            const userId = 'user_' + Math.random().toString(36).substr(2, 9);
+            const userRef = ref(database, `users/${userId}`);
+            const usersRef = ref(database, 'users');
+
+            // Set user as online
+            set(userRef, {
+                online: true,
+                timestamp: serverTimestamp()
+            });
+
+            // Remove user on disconnect
+            onDisconnect(userRef).remove();
+
+            // Listen to online users count
+            onValue(usersRef, (snapshot) => {
+                const data = snapshot.val();
+                const count = data ? Object.keys(data).length : 0;
+                document.getElementById('onlineCount').textContent = count;
+            });
+
+            // Clean up on page unload
+            window.addEventListener('beforeunload', () => {
+                set(userRef, null);
+            });
+        } catch (error) {
+            console.warn('Firebase not configured:', error.message);
+            // Hide online counter if Firebase is not configured
+            const counter = document.querySelector('.online-counter');
+            if (counter) counter.style.display = 'none';
+        }
+    </script>
     <script src="app.js"></script>
 </body>
 
