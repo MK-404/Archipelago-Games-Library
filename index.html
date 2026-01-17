@@ -154,6 +154,11 @@
             // Initial registration
             registerUser();
 
+            // Heartbeat: update timestamp every 30 seconds
+            setInterval(() => {
+                registerUser();
+            }, 30000);
+
             // Listen for messages from other tabs
             channel.addEventListener('message', (event) => {
                 if (event.data.type === 'ping' && event.data.userId === userId) {
@@ -173,7 +178,7 @@
                 channel.postMessage({ type: 'ping', userId: userId });
             });
 
-            // Listen to online users count
+            // Listen to online users count (filter by activity in last 60 seconds)
             onValue(usersRef, (snapshot) => {
                 const data = snapshot.val();
                 if (!data) {
@@ -181,8 +186,13 @@
                     return;
                 }
 
-                const userCount = Object.keys(data).length;
-                document.getElementById('onlineCount').textContent = userCount;
+                // Filter users active in last 60 seconds
+                const now = Date.now();
+                const activeUsers = Object.entries(data).filter(([id, user]) => {
+                    return user.timestamp && (now - user.timestamp) < 60000;
+                });
+
+                document.getElementById('onlineCount').textContent = activeUsers.length;
             });
         } catch (error) {
             console.warn('Firebase not configured:', error.message);
