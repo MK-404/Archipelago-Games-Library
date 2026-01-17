@@ -457,15 +457,15 @@ async function build() {
         console.log(`✓ No new games detected`);
     }
 
-    // Add addedDate and calculate isNew based on date (last 30 days)
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    // Add addedDate and calculate isNew based on date (last 15 days)
+    const fifteenDaysAgo = new Date();
+    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
 
     uniqueGames.forEach(game => {
         if (gameHistory[game.name]) {
             game.addedDate = gameHistory[game.name].addedDate;
             const addedDate = new Date(gameHistory[game.name].addedDate);
-            game.isNew = addedDate >= oneMonthAgo;
+            game.isNew = addedDate >= fifteenDaysAgo;
         }
     });
 
