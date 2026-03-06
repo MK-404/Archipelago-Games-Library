@@ -52,6 +52,11 @@ h1 {
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
+.last-update {
+    color: var(--text-secondary);
+    font-size: 0.85em;
+}
+
 .discord-links {
     display: flex;
     gap: 10px;

@@ -104,6 +104,13 @@ async function loadGamesData() {
         console.log(`Generated: ${data.generated}`);
         console.log(`Covers found: ${data.coversFound}/${data.totalGames}`);
 
+        // Show last update date
+        if (data.generated) {
+            const date = new Date(data.generated);
+            document.getElementById('lastUpdate').textContent =
+                'Last update: ' + date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
         hideLoading();
         // Apply default sorting (NEW games first)
         handleSearch();
