@@ -94,7 +94,7 @@ async function downloadSpreadsheet() {
 // Fetch cell data from Google Sheets API (returns all hyperlinks per cell)
 async function fetchSheetLinks(sheetName, range) {
     const encodedRange = encodeURIComponent(`${sheetName}!${range}`);
-    const fields = encodeURIComponent('sheets.data.rowData.values(formattedValue,textFormatRuns,hyperlink)');
+    const fields = encodeURIComponent('sheets.data.rowData.values(formattedValue,textFormatRuns,hyperlink,chipRuns)');
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}?ranges=${encodedRange}&fields=${fields}&includeGridData=true&key=${CONFIG.GOOGLE_SHEETS_API_KEY}`;
 
     try {
@@ -108,40 +108,62 @@ async function fetchSheetLinks(sheetName, range) {
     }
 }
 
-// Extract links from a Sheets API cell (textFormatRuns)
+// Extract links from a Sheets API cell (textFormatRuns + chipRuns + hyperlink)
 function extractApiCellLinks(cell) {
     if (!cell) return { text: '', links: [] };
     const text = cell.formattedValue || '';
     const links = [];
 
-    if (!cell.textFormatRuns) {
-        // Simple cell with a single hyperlink (no rich text)
-        if (cell.hyperlink) {
-            links.push({ text: text, url: cell.hyperlink });
-        }
-        return { text, links };
-    }
+    // Extract from textFormatRuns (regular hyperlinks in rich text)
+    if (cell.textFormatRuns) {
+        const runs = cell.textFormatRuns;
+        for (let i = 0; i < runs.length; i++) {
+            const run = runs[i];
+            const uri = run.format?.link?.uri;
+            if (!uri) continue;
 
-    const runs = cell.textFormatRuns;
-    for (let i = 0; i < runs.length; i++) {
-        const run = runs[i];
-        const uri = run.format?.link?.uri;
-        if (!uri) continue;
+            const startIdx = run.startIndex || 0;
+            let endIdx = text.length;
+            for (let j = i + 1; j < runs.length; j++) {
+                if (runs[j].startIndex !== undefined) {
+                    endIdx = runs[j].startIndex;
+                    break;
+                }
+            }
 
-        const startIdx = run.startIndex || 0;
-        // Find end: next run's startIndex or end of text
-        let endIdx = text.length;
-        for (let j = i + 1; j < runs.length; j++) {
-            if (runs[j].startIndex !== undefined) {
-                endIdx = runs[j].startIndex;
-                break;
+            const label = text.substring(startIdx, endIdx).replace(/^[\s,;]+|[\s,;]+$/g, '');
+            if (label) {
+                links.push({ text: label, url: uri });
             }
         }
+    }
 
-        const label = text.substring(startIdx, endIdx).replace(/^[\s,;]+|[\s,;]+$/g, '');
-        if (label) {
-            links.push({ text: label, url: uri });
+    // Extract from chipRuns (Google smart chips - links to Docs/Sheets/etc)
+    if (cell.chipRuns) {
+        for (let i = 0; i < cell.chipRuns.length; i++) {
+            const chip = cell.chipRuns[i];
+            const uri = chip.chip?.richLinkProperties?.uri;
+            if (!uri) continue;
+
+            const startIdx = chip.startIndex || 0;
+            let endIdx = text.length;
+            for (let j = i + 1; j < cell.chipRuns.length; j++) {
+                if (cell.chipRuns[j].startIndex !== undefined) {
+                    endIdx = cell.chipRuns[j].startIndex;
+                    break;
+                }
+            }
+
+            const label = text.substring(startIdx, endIdx).replace(/^[\s,;]+|[\s,;]+$/g, '');
+            if (label) {
+                links.push({ text: label, url: uri });
+            }
         }
+    }
+
+    // Fallback: simple cell with a single hyperlink (no rich text, no chips)
+    if (links.length === 0 && cell.hyperlink) {
+        links.push({ text: text, url: cell.hyperlink });
     }
 
     return { text, links };
