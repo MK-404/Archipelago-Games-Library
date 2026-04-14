@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Archipelago Tools & More</title>
+    <link rel="icon" type="image/png" href="favicons.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <nav class="page-nav">
+                <a href="index.html" class="nav-link">Games</a>
+                <a href="tools.html" class="nav-link highlight active">Tools & More</a>
+            </nav>
+            <div class="header-top">
+                <h1>Tools, Meta Games & Hint Games</h1>
+                <span id="lastUpdate" class="last-update"></span>
+                <div class="discord-links">
+                    <a href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer"
+                        class="discord-button" title="Discord Archipelago">
+                        <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
+                        Discord
+                    </a>
+                    <a href="https://discord.gg/rY64GAVs2U" target="_blank" rel="noopener noreferrer"
+                        class="discord-button after-dark" title="Discord After Dark (+18)">
+                        <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
+                        After Dark
+                    </a>
+                </div>
+            </div>
+            <div class="controls">
+                <input type="text" id="searchInput" placeholder="Search tools..." />
+                <select id="typeFilter">
+                    <option value="all">All Types</option>
+                    <option value="Tool">Tools</option>
+                    <option value="Meta Game">Meta Games</option>
+                    <option value="Hint Game">Hint Games</option>
+                </select>
+                <select id="sortSelect">
+                    <option value="default">Default</option>
+                    <option value="alpha-asc">A &rarr; Z</option>
+                    <option value="alpha-desc">Z &rarr; A</option>
+                    <option value="type">By Type</option>
+                    <option value="date-newest">Newest First</option>
+                    <option value="date-oldest">Oldest First</option>
+                </select>
+                <div class="adult-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="adultContentToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label">Show +18</span>
+                </div>
+                <div class="stats">
+                    <span id="toolCount">0 items</span>
+                </div>
+            </div>
+        </header>
+
+        <div id="loadingMessage" class="loading-message">
+            Loading data...
+        </div>
+
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+        <div id="toolsGrid" class="games-grid">
+            <!-- Tool cards will be inserted here -->
+        </div>
+    </div>
+
+    <!-- Age Verification Modal -->
+    <div id="ageVerificationModal" class="modal-overlay age-verification">
+        <div class="modal-content age-modal">
+            <h2 class="age-modal-title">Age Verification Required</h2>
+            <p class="age-modal-text">
+                By enabling this option, you confirm that you are of legal age in your jurisdiction.
+                Content marked as 18+ may contain sensitive themes.
+            </p>
+            <div class="age-modal-buttons">
+                <button id="ageConfirmYes" class="age-button age-yes">Yes, I am of legal age</button>
+                <button id="ageConfirmNo" class="age-button age-no">No, I am not</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tool Detail Modal -->
+    <div id="toolModal" class="modal-overlay">
+        <div class="modal-content">
+            <div id="modalBanner" class="modal-banner no-banner">
+                <button id="modalClose" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h2 id="modalTitle" class="modal-title"></h2>
+                <div id="modalType" class="modal-status"></div>
+
+                <div id="modalLinksSection" class="modal-section" style="display: none;">
+                    <h3 class="modal-section-title">Links & Downloads</h3>
+                    <div id="modalLinks" class="modal-links"></div>
+                </div>
+
+                <div id="modalNotesSection" class="modal-section" style="display: none;">
+                    <h3 class="modal-section-title">Notes</h3>
+                    <div id="modalNotes" class="modal-notes"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="tools.js"></script>
+</body>
+
+</html>

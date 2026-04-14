@@ -1,4 +1,4 @@
-// New simple frontend that loads pre-built data
+// Archipelago Games Library - Frontend
 
 // State
 let allGames = [];
@@ -19,6 +19,7 @@ const modalBanner = document.getElementById('modalBanner');
 const modalClose = document.getElementById('modalClose');
 const modalTitle = document.getElementById('modalTitle');
 const modalStatus = document.getElementById('modalStatus');
+const modalPrStatus = document.getElementById('modalPrStatus');
 const modalLinksSection = document.getElementById('modalLinksSection');
 const modalLinks = document.getElementById('modalLinks');
 const modalNotesSection = document.getElementById('modalNotesSection');
@@ -74,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ageConfirmNo.addEventListener('click', denyAge);
     ageVerificationModal.addEventListener('click', (e) => {
         if (e.target === ageVerificationModal) {
-            denyAge(); // Close and turn off if clicking outside
+            denyAge();
         }
     });
 
@@ -102,17 +103,15 @@ async function loadGamesData() {
 
         console.log(`Loaded ${allGames.length} games`);
         console.log(`Generated: ${data.generated}`);
-        console.log(`Covers found: ${data.coversFound}/${data.totalGames}`);
 
         // Show last update date
         if (data.generated) {
             const date = new Date(data.generated);
             document.getElementById('lastUpdate').textContent =
-                'Last update: ' + date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                'Last update: ' + date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         }
 
         hideLoading();
-        // Apply default sorting (NEW games first)
         handleSearch();
 
     } catch (error) {
@@ -128,25 +127,20 @@ function isGameNew(game) {
 
 // Check if game is After Dark (+18)
 function isAfterDark(game) {
-    if (!game.notes) return false;
-
-    const notesText = typeof game.notes === 'object' ? (game.notes.text || '') : game.notes;
-    return notesText.toLowerCase().includes('after dark');
+    return game.isAdult === true;
 }
 
 // Handle adult content toggle
 function handleAdultToggle() {
     if (adultContentToggle.checked) {
-        // User wants to enable adult content - show verification modal
         if (!showAdultContent) {
             openAgeVerificationModal();
         }
     } else {
-        // User wants to disable adult content
         showAdultContent = false;
         localStorage.setItem('showAdultContent', 'false');
         updateAfterDarkButton();
-        handleSearch(); // Refresh display
+        handleSearch();
     }
 }
 
@@ -169,7 +163,7 @@ function confirmAge() {
     adultContentToggle.checked = true;
     updateAfterDarkButton();
     closeAgeVerificationModal();
-    handleSearch(); // Refresh display to show adult games
+    handleSearch();
 }
 
 // Deny age (No button)
@@ -179,32 +173,20 @@ function denyAge() {
     adultContentToggle.checked = false;
     updateAfterDarkButton();
     closeAgeVerificationModal();
-    handleSearch(); // Refresh display to hide adult games
+    handleSearch();
 }
 
 // Get status priority for sorting
 function getStatusPriority(status) {
     const statusLower = status ? status.toLowerCase() : '';
 
-    // Check for worst states first (most important for mixed statuses)
-    // Broken = 7 (highest priority for problems)
-    if (statusLower.includes('broken')) return 7;
-    // Unstable = 6
-    if (statusLower.includes('unstable')) return 6;
+    if (statusLower.includes('broken')) return 6;
+    if (statusLower.includes('unstable')) return 5;
+    if (statusLower.includes('stable')) return 4;
+    if (statusLower.includes('not pring')) return 3;
+    if (statusLower.includes('in review')) return 2;
+    if (statusLower.includes('merged')) return 1;
 
-    // Then check for stable states
-    // Core-Verified = 1 (best)
-    if (statusLower.includes('core-verified')) return 1;
-    // APWorld Only = 2
-    if (statusLower.includes('apworld only')) return 2;
-    // Merged = 3
-    if (statusLower.includes('merged')) return 3;
-    // In Review = 4
-    if (statusLower.includes('in review')) return 4;
-    // Stable = 5
-    if (statusLower.includes('stable')) return 5;
-
-    // Unknown/Other = 99
     return 99;
 }
 
@@ -214,16 +196,11 @@ function sortGames(games, sortOption) {
 
     switch(sortOption) {
         case 'default':
-            // Default: NEW games first, then alphabetically
             sorted.sort((a, b) => {
                 const aIsNew = isGameNew(a);
                 const bIsNew = isGameNew(b);
-
-                // If one is new and the other isn't, new comes first
                 if (aIsNew && !bIsNew) return -1;
                 if (!aIsNew && bIsNew) return 1;
-
-                // Otherwise, sort alphabetically
                 return a.name.localeCompare(b.name);
             });
             break;
@@ -238,33 +215,26 @@ function sortGames(games, sortOption) {
 
         case 'status':
             sorted.sort((a, b) => {
-                const priorityA = getStatusPriority(a.status);
-                const priorityB = getStatusPriority(b.status);
-
-                if (priorityA !== priorityB) {
-                    return priorityA - priorityB;
-                }
-
-                // If same status, sort alphabetically
+                const priorityA = getStatusPriority(a.stability || a.status);
+                const priorityB = getStatusPriority(b.stability || b.status);
+                if (priorityA !== priorityB) return priorityA - priorityB;
                 return a.name.localeCompare(b.name);
             });
             break;
 
         case 'date-newest':
-            // Sort by date, newest first
             sorted.sort((a, b) => {
                 const dateA = a.addedDate ? new Date(a.addedDate) : new Date(0);
                 const dateB = b.addedDate ? new Date(b.addedDate) : new Date(0);
-                return dateB - dateA; // Descending (newest first)
+                return dateB - dateA;
             });
             break;
 
         case 'date-oldest':
-            // Sort by date, oldest first
             sorted.sort((a, b) => {
                 const dateA = a.addedDate ? new Date(a.addedDate) : new Date(0);
                 const dateB = b.addedDate ? new Date(b.addedDate) : new Date(0);
-                return dateA - dateB; // Ascending (oldest first)
+                return dateA - dateB;
             });
             break;
     }
@@ -287,26 +257,17 @@ function renderGames() {
     });
 }
 
-// Get status border class
+// Get status border class based on stability
 function getStatusBorderClass(status) {
     if (!status) return '';
 
     const statusLower = status.toLowerCase();
 
-    // Unstable - bordo giallo
-    if (statusLower.includes('unstable')) {
-        return 'border-yellow';
-    }
-    // Broken on main - bordo rosso
-    if (statusLower.includes('broken')) {
-        return 'border-red';
-    }
-    // Merged, In review, Stable, Core-Verified, APWorld Only - bordo verde
+    if (statusLower.includes('unstable')) return 'border-yellow';
+    if (statusLower.includes('broken')) return 'border-red';
     if (statusLower.includes('merged') ||
         statusLower.includes('in review') ||
-        statusLower.includes('stable') ||
-        statusLower.includes('core-verified') ||
-        statusLower.includes('apworld only')) {
+        statusLower.includes('stable')) {
         return 'border-green';
     }
 
@@ -318,13 +279,11 @@ function createGameCard(game) {
     const card = document.createElement('div');
     card.className = 'game-card';
 
-    // Add status border class
-    const borderClass = getStatusBorderClass(game.status);
+    const borderClass = getStatusBorderClass(game.stability || game.status);
     if (borderClass) {
         card.classList.add(borderClass);
     }
 
-    // Add click handler to open modal
     card.style.cursor = 'pointer';
     card.addEventListener('click', () => {
         openGameModal(game);
@@ -335,14 +294,21 @@ function createGameCard(game) {
         ? `<img src="${game.coverPath}" alt="${escapeHtml(game.name)}" class="game-cover" onerror="this.className='game-cover error'; this.outerHTML='<div class=\\'game-cover error\\'>${escapeHtml(game.name)}</div>';">`
         : `<div class="game-cover error">${escapeHtml(game.name)}</div>`;
 
-    // Build metadata based on game type
+    // Build metadata - stability badge
     let metadata = '';
-    if (game.status && game.status !== 'Unknown') {
-        const statusLower = game.status.toLowerCase();
-        metadata += `<span class="game-status" data-status="${statusLower}">${escapeHtml(game.status)}</span>`;
+    const stability = game.stability || game.status;
+    if (stability && stability !== 'Unknown') {
+        const statusLower = stability.toLowerCase();
+        metadata += `<span class="game-status" data-status="${statusLower}">${escapeHtml(stability)}</span>`;
     }
 
-    // Add NEW badge if game is new
+    // PR Status badge (if relevant)
+    const prStatus = game.prStatus || '';
+    if (prStatus && prStatus !== '--' && prStatus !== '') {
+        const prLower = prStatus.toLowerCase();
+        metadata += `<span class="game-pr-status" data-pr-status="${prLower}">${escapeHtml(prStatus)}</span>`;
+    }
+
     const newBadge = isGameNew(game) ? '<div class="new-badge">NEW</div>' : '';
 
     card.innerHTML = `
@@ -370,12 +336,10 @@ function handleSearch() {
     const query = normalizeText(searchInput.value.trim());
     const sortValue = sortSelect.value;
 
-    // Filter games by search query and adult content preference
     let filtered = allGames.filter(game => {
         const normalizedName = normalizeText(game.name);
         const matchesSearch = !query || normalizedName.includes(query);
 
-        // Filter out After Dark games if adult content is disabled
         if (!showAdultContent && isAfterDark(game)) {
             return false;
         }
@@ -383,7 +347,6 @@ function handleSearch() {
         return matchesSearch;
     });
 
-    // Sort games
     displayedGames = sortGames(filtered, sortValue);
 
     updateGameCount();
@@ -423,115 +386,41 @@ function escapeHtml(text) {
 
 // Get icon based on URL
 function getIconForUrl(url) {
-    if (url.includes('github.com')) {
+    if (url.includes('github.com') || url.includes('gitlab.')) {
         return '<img src="icons/github-logo.png" class="button-icon" alt="GitHub">';
-    } else if (url.includes('discord.com')) {
+    } else if (url.includes('discord.com') || url.includes('discord.gg')) {
         return '<img src="icons/discord-logo.png" class="button-icon" alt="Discord">';
     } else if (url.includes('archipelago.gg')) {
         return '<img src="icons/archipelago-logo.png" class="button-icon" alt="Archipelago">';
     }
-    return '🔗'; // Default link icon (fallback)
+    return '<span class="button-icon-text">&#128279;</span>';
 }
 
-// Parse download links from source field (Column C)
+// Parse download links from game.links field
 function parseDownloadLinks(game) {
     const links = [];
 
-    // Add game page link if it exists (Core-Verified games)
-    if (game.gamePage && game.gamePage.trim()) {
-        links.push({
-            label: 'Game Page',
-            url: game.gamePage.trim()
-        });
-    }
-
-    // Add setup page link if it exists
-    if (game.setupPage && game.setupPage.trim()) {
-        links.push({
-            label: 'Setup Guide',
-            url: game.setupPage.trim()
-        });
-    }
-
-    // Add Discord channel link if it exists (Core-Verified games)
-    if (game.discordChannel && game.discordChannel.trim()) {
-        links.push({
-            label: 'Discord Channel',
-            url: game.discordChannel.trim()
-        });
-    }
-
-    // Parse source field for download links (Playable games - Column C)
-    if (game.source) {
-        // New structure: source is an object with text and links array
-        if (typeof game.source === 'object' && game.source.links) {
-            const sourceText = game.source.text || '';
-
-            game.source.links.forEach((link, index) => {
-                let label = 'Download';
-
-                // If link text is descriptive (not just the URL), use it as label
-                const linkText = link.text || '';
-                const isJustUrl = linkText === link.url || linkText.trim() === link.url || linkText.startsWith('http');
-
-                if (!isJustUrl && linkText.length > 0) {
-                    // Use the full descriptive text as label
-                    label = linkText;
-                } else {
-                    // Link text is just URL, try to infer from context
-                    const urlIndex = sourceText.indexOf(link.url);
-                    if (urlIndex > 0) {
-                        // Get text before the URL
-                        const beforeText = sourceText.substring(Math.max(0, urlIndex - 20), urlIndex).trim();
-                        const beforeLower = beforeText.toLowerCase();
-
-                        // Check if it's in "APWorld:" or "Client:" format
-                        if (beforeLower.endsWith('apworld:') || beforeLower.endsWith('apworld')) {
-                            label = 'APWorld';
-                        } else if (beforeLower.endsWith('client:') || beforeLower.endsWith('client')) {
-                            label = 'Client';
-                        } else if (game.source.links.length > 1) {
-                            label = `Download ${index + 1}`;
-                        }
-                    } else if (game.source.links.length > 1) {
-                        label = `Download ${index + 1}`;
-                    }
-                }
-
+    if (game.links && game.links.links && game.links.links.length > 0) {
+        game.links.links.forEach(link => {
+            if (link.url) {
                 links.push({
-                    label: label,
+                    label: link.text || 'Link',
                     url: link.url
                 });
-            });
-        }
-        // Old structure: source is a string (backward compatibility)
-        else if (typeof game.source === 'string' && game.source.trim()) {
-            const sourceText = game.source.trim();
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-            const matches = sourceText.match(urlRegex);
-
-            if (matches) {
-                matches.forEach((url, index) => {
-                    links.push({
-                        label: matches.length > 1 ? `Download ${index + 1}` : 'Download',
-                        url: url
-                    });
-                });
             }
-        }
+        });
     }
 
     return links;
 }
 
-// Convert notes text with links to HTML (Column D)
+// Convert notes text with links to HTML
 function formatNotesWithLinks(game) {
     if (!game.notes) return '';
 
     let notesText = '';
     let notesLinks = [];
 
-    // Extract text and links from notes
     if (typeof game.notes === 'object') {
         notesText = game.notes.text || '';
         notesLinks = game.notes.links || [];
@@ -541,38 +430,28 @@ function formatNotesWithLinks(game) {
 
     if (!notesText.trim()) return '';
 
-    // Replace URLs in text with clickable links
     let formattedText = notesText;
 
-    // For each link, find the label before it in the text
     notesLinks.forEach(link => {
         let urlIndex = formattedText.indexOf(link.url);
 
-        // If URL is not in the text, try to find the link text
         if (urlIndex === -1 && link.text && link.text !== link.url) {
-            // The link text might be part of the notes text
             const linkTextIndex = formattedText.indexOf(link.text);
             if (linkTextIndex !== -1) {
-                // Replace the link text with a clickable link
                 const clickableLink = `<a href="${link.url}" target="_blank" rel="noopener noreferrer" class="note-link" title="${link.url}">${link.text}</a>`;
                 formattedText = formattedText.replace(link.text, clickableLink);
-                return; // Done with this link
+                return;
             }
         }
 
         if (urlIndex !== -1) {
-            // Get text around the URL to find the label
             const beforeUrl = formattedText.substring(Math.max(0, urlIndex - 100), urlIndex);
 
-            // Find the last occurrence of common patterns before the URL
-            // Pattern 1: "Label: " (with colon)
-            // Pattern 2: Text after last newline (for cases like "text\nSetup Guide here")
-            // Pattern 3: "Label " (without colon, just space)
             const patterns = [
-                /([^.!?\n]+):\s*$/,           // "Setup instructions: "
-                /\n([^\n]+)\s*$/,              // "\nSetup Guide found here"
-                /([^.!?\n]+)\s+$/,             // "Some text "
-                /^(.+)$/                       // Fallback to all text
+                /([^.!?\n]+):\s*$/,
+                /\n([^\n]+)\s*$/,
+                /([^.!?\n]+)\s+$/,
+                /^(.+)$/
             ];
             let linkLabel = 'Link';
             let labelToRemove = '';
@@ -582,43 +461,35 @@ function formatNotesWithLinks(game) {
                 const match = beforeUrl.match(pattern);
                 if (match && match[1].trim().length > 0 && match[1].trim().length < 50) {
                     linkLabel = match[1].trim();
-                    // Check if the pattern ends with ":" to remove it along with the label
-                    if (pattern === patterns[0]) { // Pattern with colon
-                        labelToRemove = match[0]; // Include the colon and whitespace
-                    } else if (pattern === patterns[1]) { // Pattern after newline
-                        labelToRemove = match[1]; // Text after newline (preserve any whitespace)
-                        replaceWithNewline = true; // Keep the newline before the link
+                    if (pattern === patterns[0]) {
+                        labelToRemove = match[0];
+                    } else if (pattern === patterns[1]) {
+                        labelToRemove = match[1];
+                        replaceWithNewline = true;
                     }
                     break;
                 }
             }
 
-            // Create the clickable link
             const clickableLink = `<a href="${link.url}" target="_blank" rel="noopener noreferrer" class="note-link" title="${link.url}">${linkLabel}</a>`;
 
-            // If we found a label to remove
             if (labelToRemove) {
                 if (replaceWithNewline) {
-                    // For newline pattern, replace "text url" with "\nlink" (preserve newline)
-                    // Find and replace "Setup Guide found here[URL]" with "\n[link]"
                     const textToReplace = labelToRemove + link.url;
                     const escapedText = textToReplace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     const replacePattern = new RegExp(escapedText, 'g');
                     formattedText = formattedText.replace(replacePattern, '\n' + clickableLink);
                 } else {
-                    // For colon pattern, replace "label: url" with "link"
                     const labelAndUrl = labelToRemove + link.url;
                     formattedText = formattedText.replace(labelAndUrl, clickableLink);
                 }
             } else {
-                // Otherwise just replace the URL
                 const urlPattern = new RegExp(link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
                 formattedText = formattedText.replace(urlPattern, clickableLink);
             }
         }
     });
 
-    // Convert newlines to <br> tags
     formattedText = formattedText.replace(/\n/g, '<br>');
 
     return formattedText;
@@ -632,13 +503,14 @@ async function openGameModal(game) {
     // Set title
     modalTitle.textContent = game.name;
 
-    // Set status
-    if (game.status) {
-        modalStatus.textContent = game.status;
+    // Set stability status
+    const stability = game.stability || game.status;
+    if (stability) {
+        modalStatus.textContent = stability;
         modalStatus.className = 'modal-status';
+        modalStatus.style.display = '';
 
-        // Apply same styling as game cards
-        const statusLower = game.status.toLowerCase();
+        const statusLower = stability.toLowerCase();
         if (statusLower.includes('unstable')) {
             modalStatus.style.background = 'rgba(255, 193, 7, 0.2)';
             modalStatus.style.color = '#ffc107';
@@ -656,6 +528,35 @@ async function openGameModal(game) {
         modalStatus.style.display = 'none';
     }
 
+    // Set PR Status badge
+    const prStatus = game.prStatus || '';
+    if (modalPrStatus) {
+        if (prStatus && prStatus !== '--' && prStatus !== '') {
+            modalPrStatus.textContent = prStatus;
+            modalPrStatus.className = 'modal-pr-status';
+            modalPrStatus.style.display = '';
+
+            const prLower = prStatus.toLowerCase();
+            if (prLower === 'merged') {
+                modalPrStatus.style.background = 'rgba(26, 159, 255, 0.2)';
+                modalPrStatus.style.color = '#1a9fff';
+                modalPrStatus.style.border = '1px solid rgba(26, 159, 255, 0.3)';
+            } else if (prLower === 'in review') {
+                modalPrStatus.style.background = 'rgba(255, 152, 0, 0.2)';
+                modalPrStatus.style.color = '#ff9800';
+                modalPrStatus.style.border = '1px solid rgba(255, 152, 0, 0.3)';
+            } else if (prLower === 'not pring') {
+                modalPrStatus.style.background = 'rgba(143, 152, 160, 0.2)';
+                modalPrStatus.style.color = '#8f98a0';
+                modalPrStatus.style.border = '1px solid rgba(143, 152, 160, 0.3)';
+            } else {
+                modalPrStatus.style.display = 'none';
+            }
+        } else {
+            modalPrStatus.style.display = 'none';
+        }
+    }
+
     // Set banner from local file
     modalBanner.style.backgroundImage = '';
     modalBanner.classList.remove('no-banner');
@@ -666,7 +567,7 @@ async function openGameModal(game) {
         modalBanner.classList.add('no-banner');
     }
 
-    // Parse and display download links (Column C only)
+    // Parse and display download links
     const downloadLinks = parseDownloadLinks(game);
 
     if (downloadLinks.length > 0) {
@@ -678,10 +579,9 @@ async function openGameModal(game) {
             linkElement.target = '_blank';
             linkElement.rel = 'noopener noreferrer';
 
-            // Add icon and label
             const icon = getIconForUrl(link.url);
-            linkElement.innerHTML = `${icon} ${link.label}`;
-            linkElement.title = link.url; // Show URL on hover
+            linkElement.innerHTML = `${icon} ${escapeHtml(link.label)}`;
+            linkElement.title = link.url;
 
             modalLinks.appendChild(linkElement);
         });
@@ -690,11 +590,11 @@ async function openGameModal(game) {
         modalLinksSection.style.display = 'none';
     }
 
-    // Display notes with inline clickable links (Column D)
+    // Display notes with inline clickable links
     const formattedNotes = formatNotesWithLinks(game);
 
     if (formattedNotes) {
-        modalNotes.innerHTML = formattedNotes; // Use innerHTML to render links
+        modalNotes.innerHTML = formattedNotes;
         modalNotesSection.style.display = 'block';
     } else {
         modalNotesSection.style.display = 'none';

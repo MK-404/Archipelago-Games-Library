@@ -2,34 +2,32 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const XLSX = require('xlsx');
 
 // Configuration
 const CONFIG = {
     STEAMGRIDDB_API_KEY: process.env.STEAMGRIDDB_API_KEY || '',
-    CORE_VERIFIED_HTML: path.join(__dirname, '../extract/Core-Verified Worlds.html'),
-    PLAYABLE_WORLDS_HTML: path.join(__dirname, '../extract/Playable Worlds.html'),
+    SPREADSHEET_ID: '1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw',
+    XLSX_PATH: path.join(__dirname, '../extract/spreadsheet.xlsx'),
     OUTPUT_DIR: path.join(__dirname, '../data'),
     COVERS_DIR: path.join(__dirname, '../data/covers'),
     BANNERS_DIR: path.join(__dirname, '../data/banners'),
     OUTPUT_JSON: path.join(__dirname, '../data/games.json'),
+    OUTPUT_TOOLS_JSON: path.join(__dirname, '../data/tools.json'),
     HISTORY_JSON: path.join(__dirname, '../data/game-history.json'),
-    BATCH_SIZE: 10, // Process 10 games in parallel
-    DELAY_BETWEEN_BATCHES: 1000, // 1 second delay between batches
+    TOOLS_HISTORY_JSON: path.join(__dirname, '../data/tools-history.json'),
+    EXTRACT_DIR: path.join(__dirname, '../extract'),
+    BATCH_SIZE: 10,
+    DELAY_BETWEEN_BATCHES: 1000,
 };
-
-// Platform detection removed - not needed
 
 // Ensure directories exist
 function ensureDirectories() {
-    if (!fs.existsSync(CONFIG.OUTPUT_DIR)) {
-        fs.mkdirSync(CONFIG.OUTPUT_DIR);
-    }
-    if (!fs.existsSync(CONFIG.COVERS_DIR)) {
-        fs.mkdirSync(CONFIG.COVERS_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(CONFIG.BANNERS_DIR)) {
-        fs.mkdirSync(CONFIG.BANNERS_DIR, { recursive: true });
-    }
+    [CONFIG.OUTPUT_DIR, CONFIG.COVERS_DIR, CONFIG.BANNERS_DIR, CONFIG.EXTRACT_DIR].forEach(dir => {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+    });
 }
 
 // Sleep function
@@ -37,192 +35,342 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Load game history
-function loadGameHistory() {
-    if (fs.existsSync(CONFIG.HISTORY_JSON)) {
+// HTTPS GET that follows redirects and returns a Buffer
+function httpsGetBuffer(url, maxRedirects = 5) {
+    return new Promise((resolve, reject) => {
+        if (maxRedirects <= 0) {
+            return reject(new Error('Too many redirects'));
+        }
+
+        const parsedUrl = new URL(url);
+        const protocol = parsedUrl.protocol === 'https:' ? https : http;
+
+        protocol.get(url, (res) => {
+            if ([301, 302, 307, 308].includes(res.statusCode)) {
+                const redirectUrl = res.headers.location;
+                if (!redirectUrl) {
+                    return reject(new Error(`Redirect ${res.statusCode} without Location header`));
+                }
+                const absoluteUrl = new URL(redirectUrl, url).href;
+                console.log(`  Redirect ${res.statusCode} -> ${absoluteUrl.substring(0, 80)}...`);
+                httpsGetBuffer(absoluteUrl, maxRedirects - 1)
+                    .then(resolve)
+                    .catch(reject);
+                return;
+            }
+
+            if (res.statusCode !== 200) {
+                return reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+            }
+
+            const chunks = [];
+            res.on('data', (chunk) => chunks.push(chunk));
+            res.on('end', () => resolve(Buffer.concat(chunks)));
+        }).on('error', reject);
+    });
+}
+
+// Download the full spreadsheet as XLSX
+async function downloadSpreadsheet() {
+    const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/export?format=xlsx`;
+    console.log(`\nDownloading spreadsheet as XLSX...`);
+
+    try {
+        const buffer = await httpsGetBuffer(url);
+        fs.writeFileSync(CONFIG.XLSX_PATH, buffer);
+        console.log(`  Saved: ${CONFIG.XLSX_PATH} (${(buffer.length / 1024).toFixed(1)} KB)`);
+        return true;
+    } catch (error) {
+        console.log(`  Download failed: ${error.message}`);
+        if (fs.existsSync(CONFIG.XLSX_PATH)) {
+            console.log(`  Using existing local file as fallback`);
+            return true;
+        }
+        return false;
+    }
+}
+
+// Load history (shared for games and tools)
+function loadHistory(historyPath) {
+    if (fs.existsSync(historyPath)) {
         try {
-            const data = fs.readFileSync(CONFIG.HISTORY_JSON, 'utf-8');
+            const data = fs.readFileSync(historyPath, 'utf-8');
             return JSON.parse(data);
         } catch (error) {
-            console.log(`⚠ Warning: Could not read game history: ${error.message}`);
+            console.log(`Warning: Could not read history: ${error.message}`);
             return {};
         }
     }
     return {};
 }
 
-// Save game history
-function saveGameHistory(history) {
+// Save history
+function saveHistory(history, historyPath) {
     try {
-        fs.writeFileSync(CONFIG.HISTORY_JSON, JSON.stringify(history, null, 2));
+        fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
     } catch (error) {
-        console.log(`⚠ Warning: Could not save game history: ${error.message}`);
+        console.log(`Warning: Could not save history: ${error.message}`);
     }
 }
 
-// Update game history with new games
-function updateGameHistory(games, history) {
+// Update history with new entries
+function updateHistory(items, history) {
     const now = new Date().toISOString();
-    const newGameNames = new Set();
+    const newNames = new Set();
 
-    // Add new games to history
-    games.forEach(game => {
-        if (!history[game.name]) {
-            history[game.name] = {
+    items.forEach(item => {
+        if (!history[item.name]) {
+            history[item.name] = {
                 addedDate: now,
                 firstSeen: now
             };
-            newGameNames.add(game.name);
+            newNames.add(item.name);
         }
     });
 
-    return { newGamesCount: newGameNames.size, newGameNames };
+    return { newCount: newNames.size, newNames };
 }
 
-// Parse HTML table rows
-function parseHTMLTable(html) {
-    const rows = [];
-    const trRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-    let trMatch;
+// Extract links from a cell's rich text XML and hyperlink
+// XLSX stores only 1 hyperlink per cell, but the rich text XML shows
+// which text fragments are styled as links (blue + underline).
+// We extract the labeled link parts and map the first URL to the first label.
+function extractCellLinks(cell) {
+    if (!cell) return { text: '', links: [] };
 
-    while ((trMatch = trRegex.exec(html)) !== null) {
-        const rowContent = trMatch[1];
-        const cells = [];
-        const tdRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-        let tdMatch;
+    const text = (cell.v || '').toString().trim();
+    const links = [];
 
-        while ((tdMatch = tdRegex.exec(rowContent)) !== null) {
-            const cellContent = tdMatch[1];
-            const links = [];
-            const aRegex = /<a[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
-            let aMatch;
+    // Get the primary hyperlink URL (only one per cell in XLSX)
+    const primaryUrl = cell.l ? (cell.l.Target || (cell.l.Rel && cell.l.Rel.Target) || '') : '';
 
-            while ((aMatch = aRegex.exec(cellContent)) !== null) {
-                links.push({
-                    text: aMatch[2].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim(),
-                    url: aMatch[1]
-                });
-            }
-
-            let text = cellContent
-                .replace(/<br\s*\/?>/gi, '\n') // Preserve line breaks
-                .replace(/<[^>]+>/g, '')
-                .replace(/&nbsp;/g, ' ')
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&quot;/g, '"')
-                .replace(/&#39;/g, "'")
-                .replace(/ +/g, ' ') // Multiple spaces to single space
-                .trim();
-
-            cells.push({ text, links });
+    if (!cell.r) {
+        // No rich text - simple cell
+        if (primaryUrl) {
+            links.push({ text: text, url: primaryUrl.replace(/&amp;/g, '&') });
         }
+        return { text, links };
+    }
 
-        if (cells.length > 0) {
-            rows.push(cells);
+    // Parse rich text XML to extract labeled link segments
+    // Rich text format: <r><rPr><color rgb="FF1155CC"/><u/></rPr><t>Label</t></r>
+    // Link segments have color #1155CC (Google's link blue) and underline
+    const richXml = cell.r;
+    const segmentRegex = /<r>([\s\S]*?)<\/r>/gi;
+    let match;
+    const linkLabels = [];
+
+    while ((match = segmentRegex.exec(richXml)) !== null) {
+        const segment = match[1];
+        // Extract the text
+        const textMatch = segment.match(/<t[^>]*>([\s\S]*?)<\/t>/i);
+        if (!textMatch) continue;
+        const segText = textMatch[1].trim();
+        if (!segText || segText === ',' || segText === ', ' || segText === '; ') continue;
+
+        // Check if this segment is styled as a link (blue color + underline)
+        const isLink = segment.includes('1155CC') || segment.includes('underline');
+
+        if (isLink && segText.length > 0) {
+            linkLabels.push(segText);
         }
     }
 
-    return rows;
+    if (linkLabels.length > 0 && primaryUrl) {
+        // First label gets the real URL
+        links.push({ text: linkLabels[0], url: primaryUrl.replace(/&amp;/g, '&') });
+        // Remaining labels - we don't have their URLs from XLSX
+        // Store them with an empty url so the frontend knows they exist as labels
+        for (let i = 1; i < linkLabels.length; i++) {
+            links.push({ text: linkLabels[i], url: '' });
+        }
+    } else if (primaryUrl) {
+        links.push({ text: text, url: primaryUrl.replace(/&amp;/g, '&') });
+    }
+
+    return { text, links };
 }
 
-// Parse Core-Verified Worlds HTML
-function parseCoreVerified(filePath) {
-    console.log(`\nParsing: ${filePath}`);
-    const html = fs.readFileSync(filePath, 'utf-8');
-    const rows = parseHTMLTable(html);
+// Check if a row is an instruction/header row (skip it)
+function isInstructionRow(name) {
+    if (!name || name.length <= 1) return true;
+    const lower = name.toLowerCase();
+    // Skip header
+    if (lower === 'game') return true;
+    // Skip instruction rows that are clearly not game names
+    if (lower.includes('the person generating')) return true;
+    if (lower.includes('the apworlds should be placed')) return true;
+    if (lower.includes('alternate places to get info')) return true;
+    if (lower.includes('hover over column headers')) return true;
+    if (lower.includes('please only download')) return true;
+    if (lower.includes('do not sort')) return true;
+    if (lower.includes('this is a duplication')) return true;
+    if (lower.includes('if something is missing')) return true;
+    // Skip rows with very long names (likely instruction text)
+    if (name.length > 80) return true;
+    return false;
+}
+
+// Compute game type from PR Status
+function computeType(prStatus) {
+    const pr = (prStatus || '').trim().toLowerCase();
+    if (pr === 'merged' || pr === 'in review') return 'Core-Verified';
+    return 'Playable';
+}
+
+// Get cell value as string
+function getCellText(ws, ref) {
+    const cell = ws[ref];
+    if (!cell) return '';
+    return (cell.v || '').toString().trim();
+}
+
+// Get cell as boolean (for TRUE/FALSE)
+function getCellBool(ws, ref) {
+    const cell = ws[ref];
+    if (!cell) return false;
+    if (typeof cell.v === 'boolean') return cell.v;
+    return (cell.v || '').toString().toUpperCase() === 'TRUE';
+}
+
+// Parse Playable Worlds sheet from XLSX workbook
+// Columns: A=Game, B=Stability, C=PR Status, D=Links & Downloads, E=18+/Unrated, F=Notes
+function parsePlayableWorlds(wb) {
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('playable'));
+    if (!sheetName) {
+        console.log('  Warning: "Playable Worlds" sheet not found');
+        return [];
+    }
+
+    console.log(`\nParsing sheet: "${sheetName}"`);
+    const ws = wb.Sheets[sheetName];
+    const range = XLSX.utils.decode_range(ws['!ref']);
     const games = [];
 
-    for (const row of rows) {
-        if (row.length >= 4) {
-            const name = row[0].text;
+    for (let row = range.s.r; row <= range.e.r; row++) {
+        const name = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 0 }));
+        if (isInstructionRow(name)) continue;
 
-            if (!name || name === 'Game' ||
-                name.toLowerCase().includes('please') ||
-                name.toLowerCase().includes('headers') ||
-                name.toLowerCase().includes('if something') ||
-                name.toLowerCase().includes('do not sort') ||
-                name.toLowerCase().includes('this is a duplication') ||
-                name.length <= 1) {
-                continue;
-            }
+        const stability = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 1 }));
+        const prStatus = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 2 }));
+        const linksCell = ws[XLSX.utils.encode_cell({ r: row, c: 3 })];
+        const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 4 }));
+        const notesCell = ws[XLSX.utils.encode_cell({ r: row, c: 5 })];
 
-            games.push({
-                name: name,
-                gamePage: row[1].links.length > 0 ? row[1].links[0].url : '',
-                setupGuide: row[2].links.length > 0 ? row[2].links[0].url : '',
-                discordChannel: row[3].links.length > 0 ? row[3].links[0].url : '',
-                status: 'Core-Verified',
-                type: 'Core-Verified',
-                coverPath: null,
-                bannerPath: null
-            });
-        }
+        const linksData = extractCellLinks(linksCell);
+        const notesData = extractCellLinks(notesCell);
+
+        games.push({
+            name,
+            stability,
+            prStatus,
+            links: linksData,
+            isAdult,
+            notes: notesData,
+            status: stability,
+            type: computeType(prStatus),
+            coverPath: null,
+            bannerPath: null
+        });
     }
 
-    console.log(`  Found ${games.length} Core-Verified games`);
+    console.log(`  Found ${games.length} games`);
     return games;
 }
 
-// Parse Playable Worlds HTML
-function parsePlayableWorlds(filePath) {
-    console.log(`\nParsing: ${filePath}`);
-    const html = fs.readFileSync(filePath, 'utf-8');
-    const rows = parseHTMLTable(html);
-    const games = [];
-
-    for (const row of rows) {
-        if (row.length >= 4) {
-            const name = row[0].text;
-
-            if (!name || name === 'Game' ||
-                name.toLowerCase().includes('please') ||
-                name.toLowerCase().includes('headers') ||
-                name.toLowerCase().includes('if something') ||
-                name.toLowerCase().includes('do not sort') ||
-                name.toLowerCase().includes('this is a duplication') ||
-                name.length <= 1) {
-                continue;
-            }
-
-            games.push({
-                name: name,
-                status: row[1].text,
-                source: {
-                    text: row[2].text,
-                    links: row[2].links
-                },
-                notes: {
-                    text: row[3].text,
-                    links: row[3].links
-                },
-                type: 'Playable',
-                coverPath: null,
-                bannerPath: null
-            });
-        }
+// Parse Core-Verified Worlds sheet from XLSX workbook
+// Columns: A=Game, B=Game Page (link), C=Setup Guide (link), D=Discord Channel (link)
+function parseCoreVerified(wb) {
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('core-verified'));
+    if (!sheetName) {
+        console.log('  Warning: "Core-Verified Worlds" sheet not found');
+        return [];
     }
 
-    console.log(`  Found ${games.length} Playable Worlds games`);
+    console.log(`\nParsing sheet: "${sheetName}"`);
+    const ws = wb.Sheets[sheetName];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const games = [];
+
+    for (let row = range.s.r; row <= range.e.r; row++) {
+        const name = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 0 }));
+        if (isInstructionRow(name)) continue;
+
+        // Build links from columns B, C, D (each has a hyperlink)
+        const links = [];
+        const colLabels = ['Game Page', 'Setup Guide', 'Discord Channel'];
+        for (let c = 1; c <= 3; c++) {
+            const cell = ws[XLSX.utils.encode_cell({ r: row, c })];
+            if (cell && cell.l) {
+                const url = cell.l.Target || (cell.l.Rel && cell.l.Rel.Target) || '';
+                if (url) {
+                    links.push({
+                        text: colLabels[c - 1],
+                        url: url.replace(/&amp;/g, '&')
+                    });
+                }
+            }
+        }
+
+        const linkTexts = links.map(l => l.text).join(', ');
+
+        games.push({
+            name,
+            stability: 'Stable',
+            prStatus: 'Merged',
+            links: { text: linkTexts, links },
+            isAdult: false,
+            notes: { text: '', links: [] },
+            status: 'Stable',
+            type: 'Core-Verified',
+            coverPath: null,
+            bannerPath: null
+        });
+    }
+
+    console.log(`  Found ${games.length} core-verified games`);
     return games;
 }
 
-// Parse HTML files
-function parseHTML() {
-    console.log('\n=== Parsing HTML Files ===');
-
-    if (!fs.existsSync(CONFIG.CORE_VERIFIED_HTML)) {
-        throw new Error(`File not found: ${CONFIG.CORE_VERIFIED_HTML}`);
-    }
-    if (!fs.existsSync(CONFIG.PLAYABLE_WORLDS_HTML)) {
-        throw new Error(`File not found: ${CONFIG.PLAYABLE_WORLDS_HTML}`);
+// Parse Tools sheet from XLSX workbook
+// Columns: A=Game, B=Type, C=Links & Downloads, D=18+/Unrated, E=Notes
+function parseTools(wb) {
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('tools'));
+    if (!sheetName) {
+        console.log('  Warning: "Tools" sheet not found');
+        return [];
     }
 
-    const coreVerified = parseCoreVerified(CONFIG.CORE_VERIFIED_HTML);
-    const playableWorlds = parsePlayableWorlds(CONFIG.PLAYABLE_WORLDS_HTML);
+    console.log(`\nParsing sheet: "${sheetName}"`);
+    const ws = wb.Sheets[sheetName];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const tools = [];
 
-    return [...coreVerified, ...playableWorlds];
+    for (let row = range.s.r; row <= range.e.r; row++) {
+        const name = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 0 }));
+        if (isInstructionRow(name)) continue;
+
+        const toolType = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 1 }));
+        if (!toolType) continue; // Skip rows without a type
+
+        const linksCell = ws[XLSX.utils.encode_cell({ r: row, c: 2 })];
+        const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 3 }));
+        const notesCell = ws[XLSX.utils.encode_cell({ r: row, c: 4 })];
+
+        const linksData = extractCellLinks(linksCell);
+        const notesData = extractCellLinks(notesCell);
+
+        tools.push({
+            name,
+            toolType,
+            links: linksData,
+            isAdult,
+            notes: notesData
+        });
+    }
+
+    console.log(`  Found ${tools.length} tools/meta games/hint games`);
+    return tools;
 }
 
 // Fetch from SteamGridDB
@@ -236,11 +384,7 @@ async function fetchSteamGridDB(url) {
 
         https.get(url, options, (res) => {
             let data = '';
-
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-
+            res.on('data', (chunk) => { data += chunk; });
             res.on('end', () => {
                 if (res.statusCode === 200) {
                     resolve(JSON.parse(data));
@@ -248,9 +392,7 @@ async function fetchSteamGridDB(url) {
                     reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
                 }
             });
-        }).on('error', (err) => {
-            reject(err);
-        });
+        }).on('error', reject);
     });
 }
 
@@ -262,7 +404,6 @@ function downloadImage(url, filepath) {
 
         protocol.get(url, (response) => {
             response.pipe(file);
-
             file.on('finish', () => {
                 file.close();
                 resolve();
@@ -277,18 +418,17 @@ function downloadImage(url, filepath) {
 // Sanitize filename
 function sanitizeFilename(name) {
     return name
-        .normalize('NFD') // Decompose accented characters
-        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-        .replace(/[<>:"/\\|?*]/g, '') // Remove invalid characters
-        .replace(/\s+/g, '_') // Replace spaces with underscores
-        .substring(0, 100); // Limit length
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[<>:"/\\|?*]/g, '')
+        .replace(/\s+/g, '_')
+        .substring(0, 100);
 }
 
 // Check if a game already has a cover
 function hasExistingCover(game) {
     const sanitizedName = sanitizeFilename(game.name);
     const possibleExtensions = ['.jpg', '.png', '.webp', '.jpeg'];
-
     for (const ext of possibleExtensions) {
         const testPath = path.join(CONFIG.COVERS_DIR, sanitizedName + ext);
         if (fs.existsSync(testPath)) {
@@ -302,7 +442,6 @@ function hasExistingCover(game) {
 function hasExistingBanner(game) {
     const sanitizedName = sanitizeFilename(game.name);
     const possibleExtensions = ['.jpg', '.png', '.webp', '.jpeg'];
-
     for (const ext of possibleExtensions) {
         const testPath = path.join(CONFIG.BANNERS_DIR, sanitizedName + ext);
         if (fs.existsSync(testPath)) {
@@ -312,120 +451,94 @@ function hasExistingBanner(game) {
     return null;
 }
 
-// Fetch banner for a game (assumes banner doesn't exist yet)
+// Fetch banner for a game
 async function fetchGameBanner(game) {
     try {
-        // Create filename from game name
         const sanitizedName = sanitizeFilename(game.name);
-
-        // Clean up game name for search
         let searchName = game.name
             .replace(/\s*\(.*?\)\s*/g, '')
             .replace(/\s*\[.*?\]\s*/g, '')
             .trim();
 
         console.log(`  Searching banner: ${searchName}`);
-
-        // Search for game
         const searchUrl = `https://www.steamgriddb.com/api/v2/search/autocomplete/${encodeURIComponent(searchName)}`;
         const searchData = await fetchSteamGridDB(searchUrl);
 
         if (!searchData.data || searchData.data.length === 0) {
-            console.log(`    ❌ No results found`);
+            console.log(`    No results found`);
             return null;
         }
 
         const gameId = searchData.data[0].id;
-        const foundName = searchData.data[0].name;
-        console.log(`    ✓ Found: ${foundName} (ID: ${gameId})`);
+        console.log(`    Found: ${searchData.data[0].name} (ID: ${gameId})`);
 
-        // Fetch heroes (banners)
         const heroesUrl = `https://www.steamgriddb.com/api/v2/heroes/game/${gameId}`;
         const heroesData = await fetchSteamGridDB(heroesUrl);
 
         if (!heroesData.data || heroesData.data.length === 0) {
-            console.log(`    ❌ No banner found`);
+            console.log(`    No banner found`);
             return null;
         }
 
         const banner = heroesData.data[0];
-
-        // Download banner with game name
         const ext = path.extname(new URL(banner.url).pathname) || '.jpg';
         const filename = `${sanitizedName}${ext}`;
         const filepath = path.join(CONFIG.BANNERS_DIR, filename);
 
-        console.log(`    ⬇ Downloading banner...`);
+        console.log(`    Downloading banner...`);
         await downloadImage(banner.url, filepath);
-        console.log(`    ✓ Saved: ${filename}`);
+        console.log(`    Saved: ${filename}`);
 
-        return {
-            url: banner.url,
-            path: `data/banners/${filename}`
-        };
-
+        return { url: banner.url, path: `data/banners/${filename}` };
     } catch (error) {
-        console.log(`    ❌ Error: ${error.message}`);
+        console.log(`    Error: ${error.message}`);
         return null;
     }
 }
 
-// Fetch cover for a game (assumes cover doesn't exist yet)
+// Fetch cover for a game
 async function fetchGameCover(game) {
     try {
-        // Create filename from game name
         const sanitizedName = sanitizeFilename(game.name);
-
-        // Clean up game name for search
         let searchName = game.name
             .replace(/\s*\(.*?\)\s*/g, '')
             .replace(/\s*\[.*?\]\s*/g, '')
             .trim();
 
         console.log(`  Searching: ${searchName}`);
-
-        // Search for game
         const searchUrl = `https://www.steamgriddb.com/api/v2/search/autocomplete/${encodeURIComponent(searchName)}`;
         const searchData = await fetchSteamGridDB(searchUrl);
 
         if (!searchData.data || searchData.data.length === 0) {
-            console.log(`    ❌ No results found`);
+            console.log(`    No results found`);
             return null;
         }
 
         const gameId = searchData.data[0].id;
-        const foundName = searchData.data[0].name;
-        console.log(`    ✓ Found: ${foundName} (ID: ${gameId})`);
+        console.log(`    Found: ${searchData.data[0].name} (ID: ${gameId})`);
 
-        // Fetch grids
         const gridsUrl = `https://www.steamgriddb.com/api/v2/grids/game/${gameId}?dimensions=600x900,342x482,660x930`;
         const gridsData = await fetchSteamGridDB(gridsUrl);
 
         if (!gridsData.data || gridsData.data.length === 0) {
-            console.log(`    ❌ No covers found`);
+            console.log(`    No covers found`);
             return null;
         }
 
-        // Prefer vertical grids
         const verticalGrid = gridsData.data.find(g => g.height > g.width);
         const cover = verticalGrid || gridsData.data[0];
 
-        // Download cover with game name
         const ext = path.extname(new URL(cover.url).pathname) || '.jpg';
         const filename = `${sanitizedName}${ext}`;
         const filepath = path.join(CONFIG.COVERS_DIR, filename);
 
-        console.log(`    ⬇ Downloading cover...`);
+        console.log(`    Downloading cover...`);
         await downloadImage(cover.url, filepath);
-        console.log(`    ✓ Saved: ${filename}`);
+        console.log(`    Saved: ${filename}`);
 
-        return {
-            url: cover.url,
-            path: `data/covers/${filename}`
-        };
-
+        return { url: cover.url, path: `data/covers/${filename}` };
     } catch (error) {
-        console.log(`    ❌ Error: ${error.message}`);
+        console.log(`    Error: ${error.message}`);
         return null;
     }
 }
@@ -436,28 +549,60 @@ async function build() {
 
     ensureDirectories();
 
-    // Parse HTML files
-    const allGames = parseHTML();
+    // === Download spreadsheet ===
+    console.log('=== Downloading Spreadsheet ===');
+    const downloadOk = await downloadSpreadsheet();
+
+    if (!downloadOk) {
+        throw new Error('Could not download or find spreadsheet XLSX');
+    }
+
+    // === Read XLSX ===
+    console.log('\n=== Parsing Spreadsheet ===');
+    const xlsxData = fs.readFileSync(CONFIG.XLSX_PATH);
+    const wb = XLSX.read(xlsxData, { type: 'buffer' });
+    console.log(`Sheets found: ${wb.SheetNames.join(', ')}`);
+
+    // === Parse games ===
+    const playableGames = parsePlayableWorlds(wb);
+    const coreGames = parseCoreVerified(wb);
+
+    // Merge: Playable Worlds entries take priority (they have more detail)
+    // Core-Verified games not already in Playable Worlds get added
+    const gamesByName = new Map(playableGames.map(g => [g.name, g]));
+    let coreAdded = 0;
+    for (const cg of coreGames) {
+        if (!gamesByName.has(cg.name)) {
+            gamesByName.set(cg.name, cg);
+            coreAdded++;
+        }
+    }
+    console.log(`\nAdded ${coreAdded} games from Core-Verified sheet (not in Playable Worlds)`);
 
     // Remove duplicates
-    const uniqueGames = [...new Map(allGames.map(g => [g.name, g])).values()];
+    const uniqueGames = [...gamesByName.values()];
     console.log(`\nTotal unique games: ${uniqueGames.length}`);
 
     // Sort alphabetically
     uniqueGames.sort((a, b) => a.name.localeCompare(b.name));
 
-    // Load and update game history
+    // === Parse tools ===
+    const allToolsRaw = parseTools(wb);
+    const uniqueTools = [...new Map(allToolsRaw.map(t => [t.name, t])).values()];
+    uniqueTools.sort((a, b) => a.name.localeCompare(b.name));
+    console.log(`Total unique tools: ${uniqueTools.length}`);
+
+    // === Game history ===
     console.log('\n=== Updating Game History ===\n');
-    const gameHistory = loadGameHistory();
-    const { newGamesCount, newGameNames } = updateGameHistory(uniqueGames, gameHistory);
+    const gameHistory = loadHistory(CONFIG.HISTORY_JSON);
+    const { newCount: newGamesCount, newNames: newGameNames } = updateHistory(uniqueGames, gameHistory);
 
     if (newGamesCount > 0) {
-        console.log(`✓ Found ${newGamesCount} new game(s) added to the library!`);
+        console.log(`Found ${newGamesCount} new game(s) added to the library!`);
     } else {
-        console.log(`✓ No new games detected`);
+        console.log(`No new games detected`);
     }
 
-    // Add addedDate and calculate isNew based on date (last 15 days)
     const fifteenDaysAgo = new Date();
     fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
 
@@ -469,45 +614,54 @@ async function build() {
         }
     });
 
-    // Save updated history
-    saveGameHistory(gameHistory);
+    saveHistory(gameHistory, CONFIG.HISTORY_JSON);
 
-    // Fetch covers
+    // === Tools history ===
+    console.log('\n=== Updating Tools History ===\n');
+    const toolsHistory = loadHistory(CONFIG.TOOLS_HISTORY_JSON);
+    const { newCount: newToolsCount } = updateHistory(uniqueTools, toolsHistory);
+
+    if (newToolsCount > 0) {
+        console.log(`Found ${newToolsCount} new tool(s) added!`);
+    } else {
+        console.log(`No new tools detected`);
+    }
+
+    uniqueTools.forEach(tool => {
+        if (toolsHistory[tool.name]) {
+            tool.addedDate = toolsHistory[tool.name].addedDate;
+            const addedDate = new Date(toolsHistory[tool.name].addedDate);
+            tool.isNew = addedDate >= fifteenDaysAgo;
+        }
+    });
+
+    saveHistory(toolsHistory, CONFIG.TOOLS_HISTORY_JSON);
+
+    // === Fetch covers ===
     console.log('\n=== Checking Existing Covers ===\n');
 
-    // Check if default cover exists
     const defaultCoverPath = 'data/covers/_default.png';
-    const hasDefaultCover = fs.existsSync(defaultCoverPath);
-
-    // First, assign existing covers to ALL games
-    // Only NEW games without covers will be downloaded
+    const hasDefaultCover = fs.existsSync(path.join(__dirname, '..', defaultCoverPath));
     const gamesMissingCovers = [];
 
     for (const game of uniqueGames) {
         const existingCover = hasExistingCover(game);
         if (existingCover) {
-            // Has specific cover
             game.coverPath = existingCover;
         } else if (newGameNames.has(game.name)) {
-            // New game without cover - needs download
             gamesMissingCovers.push(game);
-        } else {
-            // Old game without specific cover - use default
-            if (hasDefaultCover) {
-                game.coverPath = defaultCoverPath;
-            }
+        } else if (hasDefaultCover) {
+            game.coverPath = defaultCoverPath;
         }
     }
 
-    console.log(`⚠ Need to download ${gamesMissingCovers.length} covers for NEW games\n`);
+    console.log(`Need to download ${gamesMissingCovers.length} covers for NEW games\n`);
 
-    // Now fetch missing covers in parallel batches
     let successCount = 0;
     let failCount = 0;
 
     if (gamesMissingCovers.length > 0) {
         console.log('=== Downloading Missing Covers ===\n');
-
         const totalBatches = Math.ceil(gamesMissingCovers.length / CONFIG.BATCH_SIZE);
 
         for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
@@ -517,138 +671,97 @@ async function build() {
 
             console.log(`\n--- Batch ${batchIndex + 1}/${totalBatches} (${start + 1}-${end}/${gamesMissingCovers.length}) ---\n`);
 
-            // Process batch in parallel
             const results = await Promise.all(
                 batch.map(async (game, index) => {
-                    const gameNumber = start + index + 1;
-                    console.log(`[${gameNumber}/${gamesMissingCovers.length}] ${game.name}`);
-
+                    console.log(`[${start + index + 1}/${gamesMissingCovers.length}] ${game.name}`);
                     const cover = await fetchGameCover(game);
-
                     if (cover) {
                         game.coverPath = cover.path;
                         return { success: true };
-                    } else {
-                        return { success: false };
                     }
+                    return { success: false };
                 })
             );
 
-            // Count results
-            results.forEach(result => {
-                if (result.success) {
-                    successCount++;
-                } else {
-                    failCount++;
-                }
-            });
+            results.forEach(r => r.success ? successCount++ : failCount++);
+            console.log(`\nBatch ${batchIndex + 1} complete: ${results.filter(r => r.success).length}/${results.length} covers`);
 
-            console.log(`\nBatch ${batchIndex + 1} complete: ${results.filter(r => r.success).length}/${results.length} covers downloaded`);
-
-            // Delay between batches (except for last batch)
             if (batchIndex < totalBatches - 1) {
-                console.log(`\nWaiting ${CONFIG.DELAY_BETWEEN_BATCHES}ms before next batch...\n`);
                 await sleep(CONFIG.DELAY_BETWEEN_BATCHES);
             }
         }
     }
 
-    // Assign default cover to games without covers
+    // Assign default cover
     if (hasDefaultCover) {
-        let defaultAssignedCount = 0;
+        let defaultCount = 0;
         uniqueGames.forEach(game => {
             if (!game.coverPath) {
                 game.coverPath = defaultCoverPath;
-                defaultAssignedCount++;
+                defaultCount++;
             }
         });
-        if (defaultAssignedCount > 0) {
-            console.log(`\n✓ Assigned default cover to ${defaultAssignedCount} games without covers`);
-        }
+        if (defaultCount > 0) console.log(`\nAssigned default cover to ${defaultCount} games`);
     }
 
-    // Fetch banners
+    // === Fetch banners ===
     console.log('\n=== Checking Existing Banners ===\n');
 
-    // First, assign existing banners to ALL games
-    // Only NEW games without banners will be downloaded
-    const gamesMissingBanners = [];
     const defaultBannerPath = 'data/banners/_default.png';
-    const hasDefaultBanner = fs.existsSync(defaultBannerPath);
+    const hasDefaultBanner = fs.existsSync(path.join(__dirname, '..', defaultBannerPath));
+    const gamesMissingBanners = [];
 
     for (const game of uniqueGames) {
         const existingBanner = hasExistingBanner(game);
         if (existingBanner) {
-            // Has specific banner
             game.bannerPath = existingBanner;
         } else if (newGameNames.has(game.name)) {
-            // New game without banner - needs download
             gamesMissingBanners.push(game);
-        } else {
-            // Old game without specific banner - use default
-            if (hasDefaultBanner) {
-                game.bannerPath = defaultBannerPath;
-            }
+        } else if (hasDefaultBanner) {
+            game.bannerPath = defaultBannerPath;
         }
     }
 
-    console.log(`⚠ Need to download ${gamesMissingBanners.length} banners for NEW games\n`);
+    console.log(`Need to download ${gamesMissingBanners.length} banners for NEW games\n`);
 
-    // Now fetch missing banners in parallel batches
-    let bannersSuccessCount = 0;
-    let bannersFailCount = 0;
+    let bannersSuccess = 0;
+    let bannersFail = 0;
 
     if (gamesMissingBanners.length > 0) {
         console.log('=== Downloading Missing Banners ===\n');
+        const totalBatches = Math.ceil(gamesMissingBanners.length / CONFIG.BATCH_SIZE);
 
-        const totalBannerBatches = Math.ceil(gamesMissingBanners.length / CONFIG.BATCH_SIZE);
-
-        for (let batchIndex = 0; batchIndex < totalBannerBatches; batchIndex++) {
+        for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
             const start = batchIndex * CONFIG.BATCH_SIZE;
             const end = Math.min(start + CONFIG.BATCH_SIZE, gamesMissingBanners.length);
             const batch = gamesMissingBanners.slice(start, end);
 
-            console.log(`\n--- Batch ${batchIndex + 1}/${totalBannerBatches} (${start + 1}-${end}/${gamesMissingBanners.length}) ---\n`);
+            console.log(`\n--- Batch ${batchIndex + 1}/${totalBatches} (${start + 1}-${end}/${gamesMissingBanners.length}) ---\n`);
 
-            // Process batch in parallel
             const results = await Promise.all(
                 batch.map(async (game, index) => {
-                    const gameNumber = start + index + 1;
-                    console.log(`[${gameNumber}/${gamesMissingBanners.length}] ${game.name}`);
-
+                    console.log(`[${start + index + 1}/${gamesMissingBanners.length}] ${game.name}`);
                     const banner = await fetchGameBanner(game);
-
                     if (banner) {
                         game.bannerPath = banner.path;
                         return { success: true };
-                    } else {
-                        return { success: false };
                     }
+                    return { success: false };
                 })
             );
 
-            // Count results
-            results.forEach(result => {
-                if (result.success) {
-                    bannersSuccessCount++;
-                } else {
-                    bannersFailCount++;
-                }
-            });
+            results.forEach(r => r.success ? bannersSuccess++ : bannersFail++);
+            console.log(`\nBatch ${batchIndex + 1} complete: ${results.filter(r => r.success).length}/${results.length} banners`);
 
-            console.log(`\nBatch ${batchIndex + 1} complete: ${results.filter(r => r.success).length}/${results.length} banners downloaded`);
-
-            // Delay between batches (except for last batch)
-            if (batchIndex < totalBannerBatches - 1) {
-                console.log(`\nWaiting ${CONFIG.DELAY_BETWEEN_BATCHES}ms before next batch...\n`);
+            if (batchIndex < totalBatches - 1) {
                 await sleep(CONFIG.DELAY_BETWEEN_BATCHES);
             }
         }
     }
 
-    // Save JSON
+    // === Save games JSON ===
     console.log('\n=== Saving Data ===\n');
-    const output = {
+    const gamesOutput = {
         generated: new Date().toISOString(),
         totalGames: uniqueGames.length,
         coversFound: successCount,
@@ -656,29 +769,38 @@ async function build() {
         games: uniqueGames
     };
 
-    fs.writeFileSync(CONFIG.OUTPUT_JSON, JSON.stringify(output, null, 2));
-    console.log(`✓ Saved: ${CONFIG.OUTPUT_JSON}`);
+    fs.writeFileSync(CONFIG.OUTPUT_JSON, JSON.stringify(gamesOutput, null, 2));
+    console.log(`Saved: ${CONFIG.OUTPUT_JSON}`);
 
-    // Summary
+    // === Save tools JSON ===
+    const toolsOutput = {
+        generated: new Date().toISOString(),
+        totalTools: uniqueTools.length,
+        tools: uniqueTools
+    };
+
+    fs.writeFileSync(CONFIG.OUTPUT_TOOLS_JSON, JSON.stringify(toolsOutput, null, 2));
+    console.log(`Saved: ${CONFIG.OUTPUT_TOOLS_JSON}`);
+
+    // === Summary ===
     console.log('\n=== Build Summary ===\n');
     console.log(`Total games: ${uniqueGames.length}`);
-    console.log(`  - Core-Verified: ${uniqueGames.filter(g => g.type === 'Core-Verified').length}`);
+    console.log(`  - Core-Verified (Merged/In Review): ${uniqueGames.filter(g => g.type === 'Core-Verified').length}`);
     console.log(`  - Playable: ${uniqueGames.filter(g => g.type === 'Playable').length}`);
-    console.log(`\nCovers found: ${successCount} (${Math.round(successCount / uniqueGames.length * 100)}%)`);
-    console.log(`Covers missing: ${failCount}`);
-    console.log(`\nBanners found: ${bannersSuccessCount} (${Math.round(bannersSuccessCount / uniqueGames.length * 100)}%)`);
-    console.log(`Banners missing: ${bannersFailCount}`);
+    console.log(`\nCovers: ${successCount} downloaded, ${failCount} failed`);
+    console.log(`Banners: ${bannersSuccess} downloaded, ${bannersFail} failed`);
+    console.log(`\nTotal tools/meta/hint: ${uniqueTools.length}`);
+    console.log(`  - Tools: ${uniqueTools.filter(t => t.toolType === 'Tool').length}`);
+    console.log(`  - Meta Games: ${uniqueTools.filter(t => t.toolType === 'Meta Game').length}`);
+    console.log(`  - Hint Games: ${uniqueTools.filter(t => t.toolType === 'Hint Game').length}`);
 
-    console.log(`\nOutput saved to: ${CONFIG.OUTPUT_JSON}`);
-    console.log(`Covers saved to: ${CONFIG.COVERS_DIR}/`);
-    console.log(`Banners saved to: ${CONFIG.BANNERS_DIR}/`);
-    console.log(`\nBuild complete! 🎉`);
+    console.log(`\nBuild complete!`);
     console.log(`\nTo test: npm run serve`);
     console.log(`Then open: http://localhost:8080`);
 }
 
 // Run build
 build().catch(error => {
-    console.error('\n❌ Build failed:', error);
+    console.error('\nBuild failed:', error);
     process.exit(1);
 });

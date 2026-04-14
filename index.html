@@ -15,6 +15,10 @@
 <body>
     <div class="container">
         <header>
+            <nav class="page-nav">
+                <a href="index.html" class="nav-link active">Games</a>
+                <a href="tools.html" class="nav-link highlight">Tools & More</a>
+            </nav>
             <div class="header-top">
                 <h1>Archipelago Games Library</h1>
                 <span id="lastUpdate" class="last-update"></span>
@@ -94,7 +98,10 @@
             </div>
             <div class="modal-body">
                 <h2 id="modalTitle" class="modal-title"></h2>
-                <div id="modalStatus" class="modal-status"></div>
+                <div class="modal-status-row">
+                    <div id="modalStatus" class="modal-status"></div>
+                    <div id="modalPrStatus" class="modal-pr-status"></div>
+                </div>
 
                 <div id="modalLinksSection" class="modal-section" style="display: none;">
                     <h3 class="modal-section-title">Downloads</h3>

@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '0 8 * * *' # Every day at 10:00 Italian time (08:00 UTC)
   workflow_dispatch: # Allow manual trigger
 
 permissions:
@@ -29,6 +31,9 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Install dependencies
+        run: npm install
+
       - name: Run build script
         run: npm run build
         env:
@@ -39,7 +44,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Update game history and new covers/banners"
-          file_pattern: "data/game-history.json data/covers/* data/banners/*"
+          file_pattern: "data/game-history.json data/tools-history.json data/covers/* data/banners/*"
           commit_user_name: "GitHub Actions Bot"
           commit_user_email: "actions@github.com"
           commit_author: "GitHub Actions Bot <actions@github.com>"
