@@ -183,8 +183,6 @@ function getStatusPriority(status) {
     if (statusLower.includes('broken')) return 6;
     if (statusLower.includes('unstable')) return 5;
     if (statusLower.includes('stable')) return 4;
-    if (statusLower.includes('not pring')) return 3;
-    if (statusLower.includes('in review')) return 2;
     if (statusLower.includes('merged')) return 1;
 
     return 99;
@@ -266,7 +264,6 @@ function getStatusBorderClass(status) {
     if (statusLower.includes('unstable')) return 'border-yellow';
     if (statusLower.includes('broken')) return 'border-red';
     if (statusLower.includes('merged') ||
-        statusLower.includes('in review') ||
         statusLower.includes('stable')) {
         return 'border-green';
     }
@@ -302,11 +299,10 @@ function createGameCard(game) {
         metadata += `<span class="game-status" data-status="${statusLower}">${escapeHtml(stability)}</span>`;
     }
 
-    // PR Status badge (if relevant)
+    // PR Status badge (only show Merged)
     const prStatus = game.prStatus || '';
-    if (prStatus && prStatus !== '--' && prStatus !== '') {
-        const prLower = prStatus.toLowerCase();
-        metadata += `<span class="game-pr-status" data-pr-status="${prLower}">${escapeHtml(prStatus)}</span>`;
+    if (prStatus.toLowerCase() === 'merged') {
+        metadata += `<span class="game-pr-status" data-pr-status="merged">${escapeHtml(prStatus)}</span>`;
     }
 
     const newBadge = isGameNew(game) ? '<div class="new-badge">NEW</div>' : '';
@@ -531,27 +527,13 @@ async function openGameModal(game) {
     // Set PR Status badge
     const prStatus = game.prStatus || '';
     if (modalPrStatus) {
-        if (prStatus && prStatus !== '--' && prStatus !== '') {
+        if (prStatus.toLowerCase() === 'merged') {
             modalPrStatus.textContent = prStatus;
             modalPrStatus.className = 'modal-pr-status';
             modalPrStatus.style.display = '';
-
-            const prLower = prStatus.toLowerCase();
-            if (prLower === 'merged') {
-                modalPrStatus.style.background = 'rgba(26, 159, 255, 0.2)';
-                modalPrStatus.style.color = '#1a9fff';
-                modalPrStatus.style.border = '1px solid rgba(26, 159, 255, 0.3)';
-            } else if (prLower === 'in review') {
-                modalPrStatus.style.background = 'rgba(255, 152, 0, 0.2)';
-                modalPrStatus.style.color = '#ff9800';
-                modalPrStatus.style.border = '1px solid rgba(255, 152, 0, 0.3)';
-            } else if (prLower === 'not pring') {
-                modalPrStatus.style.background = 'rgba(143, 152, 160, 0.2)';
-                modalPrStatus.style.color = '#8f98a0';
-                modalPrStatus.style.border = '1px solid rgba(143, 152, 160, 0.3)';
-            } else {
-                modalPrStatus.style.display = 'none';
-            }
+            modalPrStatus.style.background = 'rgba(26, 159, 255, 0.2)';
+            modalPrStatus.style.color = '#1a9fff';
+            modalPrStatus.style.border = '1px solid rgba(26, 159, 255, 0.3)';
         } else {
             modalPrStatus.style.display = 'none';
         }

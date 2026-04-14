@@ -852,17 +852,6 @@ h1 {
     border: 1px solid rgba(26, 159, 255, 0.3);
 }
 
-.game-pr-status[data-pr-status="in review"] {
-    background: rgba(255, 152, 0, 0.2);
-    color: #ff9800;
-    border: 1px solid rgba(255, 152, 0, 0.3);
-}
-
-.game-pr-status[data-pr-status="not pring"] {
-    background: rgba(143, 152, 160, 0.15);
-    color: #8f98a0;
-    border: 1px solid rgba(143, 152, 160, 0.3);
-}
 
 /* Tool type badges */
 .tool-type-badge {
