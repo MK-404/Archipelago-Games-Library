@@ -40,6 +40,7 @@ jobs:
         env:
           NODE_ENV: production
           STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
+          GOOGLE_SHEETS_API_KEY: ${{ secrets.GOOGLE_SHEETS_API_KEY }}
 
       - name: Commit updated files
         uses: stefanzweifel/git-auto-commit-action@v5

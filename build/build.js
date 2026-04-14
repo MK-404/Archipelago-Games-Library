@@ -7,6 +7,7 @@ const XLSX = require('xlsx');
 // Configuration
 const CONFIG = {
     STEAMGRIDDB_API_KEY: process.env.STEAMGRIDDB_API_KEY || '',
+    GOOGLE_SHEETS_API_KEY: process.env.GOOGLE_SHEETS_API_KEY || '',
     SPREADSHEET_ID: '1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw',
     XLSX_PATH: path.join(__dirname, '../extract/spreadsheet.xlsx'),
     OUTPUT_DIR: path.join(__dirname, '../data'),
@@ -88,6 +89,62 @@ async function downloadSpreadsheet() {
         }
         return false;
     }
+}
+
+// Fetch cell data from Google Sheets API (returns all hyperlinks per cell)
+async function fetchSheetLinks(sheetName, range) {
+    const encodedRange = encodeURIComponent(`${sheetName}!${range}`);
+    const fields = encodeURIComponent('sheets.data.rowData.values(formattedValue,textFormatRuns,hyperlink)');
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SPREADSHEET_ID}?ranges=${encodedRange}&fields=${fields}&includeGridData=true&key=${CONFIG.GOOGLE_SHEETS_API_KEY}`;
+
+    try {
+        const buffer = await httpsGetBuffer(url);
+        const data = JSON.parse(buffer.toString());
+        const rows = data.sheets?.[0]?.data?.[0]?.rowData || [];
+        return rows;
+    } catch (error) {
+        console.log(`  Warning: Sheets API failed for ${sheetName}: ${error.message}`);
+        return null;
+    }
+}
+
+// Extract links from a Sheets API cell (textFormatRuns)
+function extractApiCellLinks(cell) {
+    if (!cell) return { text: '', links: [] };
+    const text = cell.formattedValue || '';
+    const links = [];
+
+    if (!cell.textFormatRuns) {
+        // Simple cell with a single hyperlink (no rich text)
+        if (cell.hyperlink) {
+            links.push({ text: text, url: cell.hyperlink });
+        }
+        return { text, links };
+    }
+
+    const runs = cell.textFormatRuns;
+    for (let i = 0; i < runs.length; i++) {
+        const run = runs[i];
+        const uri = run.format?.link?.uri;
+        if (!uri) continue;
+
+        const startIdx = run.startIndex || 0;
+        // Find end: next run's startIndex or end of text
+        let endIdx = text.length;
+        for (let j = i + 1; j < runs.length; j++) {
+            if (runs[j].startIndex !== undefined) {
+                endIdx = runs[j].startIndex;
+                break;
+            }
+        }
+
+        const label = text.substring(startIdx, endIdx).replace(/^[\s,;]+|[\s,;]+$/g, '');
+        if (label) {
+            links.push({ text: label, url: uri });
+        }
+    }
+
+    return { text, links };
 }
 
 // Load history (shared for games and tools)
@@ -233,9 +290,9 @@ function getCellBool(ws, ref) {
     return (cell.v || '').toString().toUpperCase() === 'TRUE';
 }
 
-// Parse Playable Worlds sheet from XLSX workbook
+// Parse Playable Worlds sheet from XLSX workbook + optional Sheets API data
 // Columns: A=Game, B=Stability, C=PR Status, D=Links & Downloads, E=18+/Unrated, F=Notes
-function parsePlayableWorlds(wb) {
+function parsePlayableWorlds(wb, apiRows) {
     const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('playable'));
     if (!sheetName) {
         console.log('  Warning: "Playable Worlds" sheet not found');
@@ -253,12 +310,22 @@ function parsePlayableWorlds(wb) {
 
         const stability = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 1 }));
         const prStatus = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 2 }));
-        const linksCell = ws[XLSX.utils.encode_cell({ r: row, c: 3 })];
         const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 4 }));
-        const notesCell = ws[XLSX.utils.encode_cell({ r: row, c: 5 })];
 
-        const linksData = extractCellLinks(linksCell);
-        const notesData = extractCellLinks(notesCell);
+        // Use Sheets API data for links/notes if available, fallback to XLSX
+        let linksData, notesData;
+        const apiRow = apiRows ? apiRows[row] : null;
+        const apiValues = apiRow?.values;
+
+        if (apiValues) {
+            linksData = extractApiCellLinks(apiValues[3]); // Column D
+            notesData = extractApiCellLinks(apiValues[5]); // Column F
+        } else {
+            const linksCell = ws[XLSX.utils.encode_cell({ r: row, c: 3 })];
+            const notesCell = ws[XLSX.utils.encode_cell({ r: row, c: 5 })];
+            linksData = extractCellLinks(linksCell);
+            notesData = extractCellLinks(notesCell);
+        }
 
         games.push({
             name,
@@ -332,9 +399,9 @@ function parseCoreVerified(wb) {
     return games;
 }
 
-// Parse Tools sheet from XLSX workbook
+// Parse Tools sheet from XLSX workbook + optional Sheets API data
 // Columns: A=Game, B=Type, C=Links & Downloads, D=18+/Unrated, E=Notes
-function parseTools(wb) {
+function parseTools(wb, apiRows) {
     const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('tools'));
     if (!sheetName) {
         console.log('  Warning: "Tools" sheet not found');
@@ -353,12 +420,22 @@ function parseTools(wb) {
         const toolType = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 1 }));
         if (!toolType) continue; // Skip rows without a type
 
-        const linksCell = ws[XLSX.utils.encode_cell({ r: row, c: 2 })];
         const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 3 }));
-        const notesCell = ws[XLSX.utils.encode_cell({ r: row, c: 4 })];
 
-        const linksData = extractCellLinks(linksCell);
-        const notesData = extractCellLinks(notesCell);
+        // Use Sheets API data for links/notes if available, fallback to XLSX
+        let linksData, notesData;
+        const apiRow = apiRows ? apiRows[row] : null;
+        const apiValues = apiRow?.values;
+
+        if (apiValues) {
+            linksData = extractApiCellLinks(apiValues[2]); // Column C
+            notesData = extractApiCellLinks(apiValues[4]); // Column E
+        } else {
+            const linksCell = ws[XLSX.utils.encode_cell({ r: row, c: 2 })];
+            const notesCell = ws[XLSX.utils.encode_cell({ r: row, c: 4 })];
+            linksData = extractCellLinks(linksCell);
+            notesData = extractCellLinks(notesCell);
+        }
 
         tools.push({
             name,
@@ -563,8 +640,42 @@ async function build() {
     const wb = XLSX.read(xlsxData, { type: 'buffer' });
     console.log(`Sheets found: ${wb.SheetNames.join(', ')}`);
 
+    // === Fetch full link data from Google Sheets API ===
+    let playableApiRows = null;
+    let toolsApiRows = null;
+
+    if (CONFIG.GOOGLE_SHEETS_API_KEY) {
+        console.log('\n=== Fetching links from Google Sheets API ===');
+        const playableSheet = wb.SheetNames.find(n => n.toLowerCase().includes('playable'));
+        const toolsSheet = wb.SheetNames.find(n => n.toLowerCase().includes('tools'));
+
+        if (playableSheet) {
+            const ws = wb.Sheets[playableSheet];
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            const apiRange = `A1:F${range.e.r + 1}`;
+            console.log(`  Fetching ${playableSheet} (${apiRange})...`);
+            playableApiRows = await fetchSheetLinks(playableSheet, apiRange);
+            if (playableApiRows) {
+                console.log(`  Got ${playableApiRows.length} rows from API`);
+            }
+        }
+
+        if (toolsSheet) {
+            const ws = wb.Sheets[toolsSheet];
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            const apiRange = `A1:E${range.e.r + 1}`;
+            console.log(`  Fetching ${toolsSheet} (${apiRange})...`);
+            toolsApiRows = await fetchSheetLinks(toolsSheet, apiRange);
+            if (toolsApiRows) {
+                console.log(`  Got ${toolsApiRows.length} rows from API`);
+            }
+        }
+    } else {
+        console.log('\n=== Google Sheets API key not set, using XLSX links (1 per cell) ===');
+    }
+
     // === Parse games ===
-    const playableGames = parsePlayableWorlds(wb);
+    const playableGames = parsePlayableWorlds(wb, playableApiRows);
     const coreGames = parseCoreVerified(wb);
 
     // Merge: Playable Worlds entries take priority (they have more detail)
@@ -587,7 +698,7 @@ async function build() {
     uniqueGames.sort((a, b) => a.name.localeCompare(b.name));
 
     // === Parse tools ===
-    const allToolsRaw = parseTools(wb);
+    const allToolsRaw = parseTools(wb, toolsApiRows);
     const uniqueTools = [...new Map(allToolsRaw.map(t => [t.name, t])).values()];
     uniqueTools.sort((a, b) => a.name.localeCompare(b.name));
     console.log(`Total unique tools: ${uniqueTools.length}`);
