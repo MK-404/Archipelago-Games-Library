@@ -13,6 +13,8 @@
 </head>
 
 <body>
+    <canvas id="bgCanvas"></canvas>
+    <div id="bgOverlay"></div>
     <div class="container">
         <header>
             <nav class="page-nav">
@@ -20,7 +22,7 @@
                 <a href="tools.html" class="nav-link highlight active">Tools & More</a>
             </nav>
             <div class="header-top">
-                <h1>Tools, Meta Games & Hint Games</h1>
+                <h1>Tools, Meta & Hint Games</h1>
                 <span id="lastUpdate" class="last-update"></span>
                 <div class="discord-links">
                     <a href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer"
@@ -32,6 +34,16 @@
                         class="discord-button after-dark" title="Discord After Dark (+18)">
                         <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
                         After Dark
+                    </a>
+                    <a href="https://github.com/MK-404/Archipelago-Games-Library" target="_blank"
+                        rel="noopener noreferrer" class="discord-button github-button" title="GitHub Repository">
+                        <img src="icons/github-logo.png" alt="GitHub" class="discord-icon">
+                        GitHub
+                    </a>
+                    <a href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw"
+                        target="_blank" rel="noopener noreferrer" class="discord-button spreadsheet-button"
+                        title="Source Spreadsheet">
+                        Spreadsheet
                     </a>
                 </div>
             </div>
@@ -113,7 +125,12 @@
         </div>
     </div>
 
+    <div id="bgToggle" class="bg-toggle" title="Toggle background animation">HD</div>
     <script src="tools.js"></script>
+    <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+    </script>
+    <script type="module" src="bg-animation.js"></script>
 </body>
 
 </html>

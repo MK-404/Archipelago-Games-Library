@@ -13,6 +13,8 @@
 </head>
 
 <body>
+    <canvas id="bgCanvas"></canvas>
+    <div id="bgOverlay"></div>
     <div class="container">
         <header>
             <nav class="page-nav">
@@ -32,6 +34,16 @@
                         class="discord-button after-dark" title="Discord After Dark (+18)">
                         <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
                         After Dark
+                    </a>
+                    <a href="https://github.com/MK-404/Archipelago-Games-Library" target="_blank"
+                        rel="noopener noreferrer" class="discord-button github-button" title="GitHub Repository">
+                        <img src="icons/github-logo.png" alt="GitHub" class="discord-icon">
+                        GitHub
+                    </a>
+                    <a href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw"
+                        target="_blank" rel="noopener noreferrer" class="discord-button spreadsheet-button"
+                        title="Source Spreadsheet">
+                        Spreadsheet
                     </a>
                 </div>
             </div>
@@ -71,6 +83,9 @@
 
         <div id="gamesGrid" class="games-grid">
             <!-- Game cards will be inserted here -->
+        </div>
+        <div class="secret-container">
+            <span class="secret-button" onclick="window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ','_blank')">Secret button yay</span>
         </div>
     </div>
 
@@ -209,7 +224,12 @@
             if (counter) counter.style.display = 'none';
         }
     </script>
+    <div id="bgToggle" class="bg-toggle" title="Toggle background animation">HD</div>
     <script src="app.js"></script>
+    <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+    </script>
+    <script type="module" src="bg-animation.js"></script>
 </body>
 
 </html>

@@ -927,6 +927,19 @@ async function build() {
     console.log(`  - Meta Games: ${uniqueTools.filter(t => t.toolType === 'Meta Game').length}`);
     console.log(`  - Hint Games: ${uniqueTools.filter(t => t.toolType === 'Hint Game').length}`);
 
+    // Generate easter eggs list
+    const easterEggsDir = path.join(__dirname, '../easter-eggs');
+    if (fs.existsSync(easterEggsDir)) {
+        const easterEggs = fs.readdirSync(easterEggsDir)
+            .filter(f => f.toLowerCase().endsWith('.png'))
+            .sort();
+        fs.writeFileSync(
+            path.join(easterEggsDir, 'list.json'),
+            JSON.stringify(easterEggs)
+        );
+        console.log(`\nEaster eggs: ${easterEggs.length} PNG files indexed`);
+    }
+
     console.log(`\nBuild complete!`);
     console.log(`\nTo test: npm run serve`);
     console.log(`Then open: http://localhost:8080`);

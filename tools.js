@@ -1,4 +1,4 @@
-// Archipelago Tools, Meta Games & Hint Games - Frontend
+// Archipelago Tools, Meta & Hint Games - Frontend
 
 // State
 let allTools = [];
@@ -174,7 +174,7 @@ function getTypePriority(toolType) {
 function sortTools(tools, sortOption) {
     const sorted = [...tools];
 
-    switch(sortOption) {
+    switch (sortOption) {
         case 'default':
             sorted.sort((a, b) => {
                 const aIsNew = a.isNew === true;
