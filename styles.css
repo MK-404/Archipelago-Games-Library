@@ -607,7 +607,7 @@ h1 {
 
 .game-cover {
     width: 100%;
-    aspect-ratio: 15 / 21;
+    aspect-ratio: 2 / 3;
     object-fit: cover;
     background: linear-gradient(135deg, #2a475e 0%, #1b2838 100%);
     display: block;
