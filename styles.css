@@ -264,6 +264,12 @@ h1 {
     cursor: pointer;
 }
 
+.egg-spawn-btn {
+    margin-left: 20px;
+    font-size: 0.7em !important;
+    color: rgba(143, 152, 160, 0.5) !important;
+}
+
 .discord-icon {
     width: 20px;
     height: 20px;

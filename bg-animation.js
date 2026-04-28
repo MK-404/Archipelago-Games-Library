@@ -283,6 +283,41 @@ async function initBackground() {
 
     animate();
 
+    // Expose manual easter egg spawn (used by Konami Code button)
+    window.spawnEasterEgg = function() {
+        if (!easterEggs.length) return;
+        const eggFile = easterEggs[Math.floor(Math.random() * easterEggs.length)];
+        const texture = getEasterEggTexture(eggFile);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        const size = BASE_SIZE * (1 + Math.random());
+        sprite.scale.set(size * 2, size * 2, 1);
+        sprite.isEasterEgg = true;
+
+        const edge = Math.floor(Math.random() * 4);
+        let x, y;
+        switch (edge) {
+            case 0: x = (Math.random() * 2 - 1) * BOUNDS.x; y = BOUNDS.y + size; break;
+            case 1: x = (Math.random() * 2 - 1) * BOUNDS.x; y = -BOUNDS.y - size; break;
+            case 2: x = -BOUNDS.x - size; y = (Math.random() * 2 - 1) * BOUNDS.y; break;
+            default: x = BOUNDS.x + size; y = (Math.random() * 2 - 1) * BOUNDS.y; break;
+        }
+        sprite.position.set(x, y, (Math.random() * 2 - 1) * 5);
+
+        const targetX = -x * (0.3 + Math.random() * 0.5);
+        const targetY = -y * (0.3 + Math.random() * 0.5);
+        const angle = Math.atan2(targetY - y, targetX - x);
+        const speed = MOVE_SPEED * (0.8 + Math.random() * 0.8);
+
+        shapes.push({
+            mesh: sprite,
+            velocity: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+            rotVelocity: { x: 0, y: 0, z: (Math.random() * 2 - 1) * ROT_SPEED },
+            size
+        });
+        scene.add(sprite);
+    };
+
     // Toggle button
     const toggleBtn = document.getElementById('bgToggle');
     if (toggleBtn) {
@@ -318,6 +353,25 @@ async function initBackground() {
         });
     }
 }
+
+// Konami Code listener
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a','Enter'];
+let konamiIndex = 0;
+document.addEventListener('keydown', (e) => {
+    if (e.key === KONAMI[konamiIndex]) {
+        konamiIndex++;
+        if (konamiIndex === KONAMI.length) {
+            konamiIndex = 0;
+            const btn = document.getElementById('eggSpawnBtn');
+            if (btn) {
+                btn.style.display = 'inline';
+            }
+        }
+    } else {
+        konamiIndex = 0;
+        if (e.key === KONAMI[0]) konamiIndex = 1;
+    }
+});
 
 // Check for reduced motion preference
 if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
