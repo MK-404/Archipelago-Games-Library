@@ -5,8 +5,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: '0 8 * * *'  # Every day at 10:00 AM Italian time (08:00 UTC)
-    - cron: '0 20 * * *' # Every day at 10:00 PM Italian time (20:00 UTC)
+    - cron: '0 */4 * * *' # Every 4 hours
   workflow_dispatch: # Allow manual trigger
 
 permissions:
