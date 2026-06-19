@@ -26,7 +26,8 @@ export default {
 
             const tokens = await tokenRes.json();
             if (!tokens.access_token) {
-                return Response.redirect(`${env.SITE_URL}/#auth_error=token_failed`);
+                const detail = encodeURIComponent(tokens.error || JSON.stringify(tokens));
+                return Response.redirect(`${env.SITE_URL}/#auth_error=token_failed&detail=${detail}`);
             }
 
             const userRes = await fetch('https://discord.com/api/users/@me', {

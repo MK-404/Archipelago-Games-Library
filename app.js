@@ -708,7 +708,7 @@ function initAuth() {
 
     if (hash && hash.includes('auth_error=')) {
         const params = new URLSearchParams(hash.substring(1));
-        console.warn('Discord auth error:', params.get('auth_error'));
+        console.warn('Discord auth error:', params.get('auth_error'), params.get('detail'));
         history.replaceState(null, '', window.location.pathname + window.location.search);
     }
 
