@@ -551,7 +551,7 @@ h1 {
     background: var(--bg-card);
     border-radius: 5px;
     overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
     cursor: pointer;
     position: relative;
     border: 3px solid transparent;
@@ -660,9 +660,6 @@ h1 {
 .game-meta {
     font-size: 0.85em;
     color: var(--text-secondary);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
 }
 
 .game-status {
@@ -1073,6 +1070,192 @@ h1 {
 #typeFilter:focus {
     outline: none;
     border-color: var(--accent-blue);
+}
+
+/* Auth section (in page-nav, pushed to right) */
+.auth-section {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.discord-login-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    background: #5865F2;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(88, 101, 242, 0.3);
+    white-space: nowrap;
+}
+
+.discord-login-btn:hover {
+    background: #4752C4;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.5);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    background: rgba(88, 101, 242, 0.15);
+    border: 1px solid rgba(88, 101, 242, 0.3);
+    border-radius: 20px;
+}
+
+.user-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-name {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--text-primary);
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.logout-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.1em;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.2s;
+    font-family: inherit;
+}
+
+.logout-btn:hover {
+    color: #f44336;
+}
+
+/* Game cover wrapper (position: relative per il NEW badge) */
+.game-cover-wrapper {
+    position: relative;
+    display: block;
+}
+
+/* Game meta row: badges a sinistra, actions a destra */
+.game-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.game-meta-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+}
+
+.game-actions {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* Star (favorite) button — inline nel game-info */
+.star-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 1px 2px;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.15s, transform 0.15s, color 0.15s;
+}
+
+.game-card:hover .star-btn {
+    opacity: 1;
+}
+
+.star-btn .icon-fill,
+.thumbs-btn .icon-fill {
+    display: none;
+}
+
+.star-btn.favorited .icon-outline,
+.thumbs-btn.voted .icon-outline {
+    display: none;
+}
+
+.star-btn.favorited .icon-fill,
+.thumbs-btn.voted .icon-fill {
+    display: flex;
+}
+
+.star-btn.favorited {
+    opacity: 1 !important;
+    color: #ffc107;
+}
+
+.star-btn:hover {
+    transform: scale(1.2);
+    color: #ffc107;
+}
+
+/* Thumbs up area — inline nel game-info */
+.thumbs-area {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.game-card:hover .thumbs-area {
+    opacity: 1;
+}
+
+.thumbs-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 1px 2px;
+    display: flex;
+    align-items: center;
+    transition: transform 0.15s, color 0.15s;
+}
+
+.thumbs-btn:hover {
+    transform: scale(1.2);
+    color: #5865f2;
+}
+
+.thumbs-btn.voted {
+    color: #5865f2;
+}
+
+.vote-count {
+    color: var(--text-secondary);
+    font-size: 0.75em;
+    font-weight: 600;
+    min-width: 10px;
 }
 
 /* Responsive design */
