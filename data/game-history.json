@@ -1,4 +1,8 @@
 {
+  "2048": {
+    "addedDate": "2026-07-16T10:12:15.863Z",
+    "firstSeen": "2026-07-16T10:12:15.863Z"
+  },
   "A Dance Of Fire And Ice": {
     "addedDate": "2025-12-27T16:26:30.769Z",
     "firstSeen": "2025-12-27T16:26:30.769Z"
@@ -2815,5 +2819,21 @@
   "The Legend Zelda: Ocarina of Time (Updated, not Ship)": {
     "addedDate": "2026-07-14T10:01:43.830Z",
     "firstSeen": "2026-07-14T10:01:43.830Z"
+  },
+  "Crash Team Racing": {
+    "addedDate": "2026-07-16T10:12:15.863Z",
+    "firstSeen": "2026-07-16T10:12:15.863Z"
+  },
+  "Geometry Dash": {
+    "addedDate": "2026-07-16T10:12:15.863Z",
+    "firstSeen": "2026-07-16T10:12:15.863Z"
+  },
+  "Library of Babel": {
+    "addedDate": "2026-07-16T10:12:15.863Z",
+    "firstSeen": "2026-07-16T10:12:15.863Z"
+  },
+  "Ys Origin": {
+    "addedDate": "2026-07-16T10:12:15.863Z",
+    "firstSeen": "2026-07-16T10:12:15.863Z"
   }
 }
