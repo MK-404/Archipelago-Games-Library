@@ -246,5 +246,17 @@
   "Archipelago Visual Tracker (AVT)": {
     "addedDate": "2026-07-12T13:27:01.463Z",
     "firstSeen": "2026-07-12T13:27:01.463Z"
+  },
+  "Logic Test": {
+    "addedDate": "2026-08-02T17:03:06.157Z",
+    "firstSeen": "2026-08-02T17:03:06.157Z"
+  },
+  "LovenseAP": {
+    "addedDate": "2026-08-02T17:03:06.157Z",
+    "firstSeen": "2026-08-02T17:03:06.157Z"
+  },
+  "Torture Client": {
+    "addedDate": "2026-08-02T17:03:06.157Z",
+    "firstSeen": "2026-08-02T17:03:06.157Z"
   }
 }
