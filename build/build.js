@@ -270,6 +270,18 @@ function extractCellLinks(cell) {
     return { text, links };
 }
 
+// Merge several {text, links} cell results into one
+function mergeLinkData(parts) {
+    const texts = [];
+    const links = [];
+    for (const part of parts) {
+        if (!part) continue;
+        if (part.text) texts.push(part.text);
+        if (part.links) links.push(...part.links);
+    }
+    return { text: texts.join(', '), links };
+}
+
 // Check if a row is an instruction/header row (skip it)
 function isInstructionRow(name) {
     if (!name || name.length <= 1) return true;
@@ -313,7 +325,8 @@ function getCellBool(ws, ref) {
 }
 
 // Parse Playable Worlds sheet from XLSX workbook + optional Sheets API data
-// Columns: A=Game, B=Stability, C=PR Status, D=Links & Downloads, E=18+/Unrated, F=Notes
+// Columns: A=Game, B=Stability, C=PR Status, D=18+/Unrated, E=Links & Downloads,
+//          F=Setup Guides, G=Support, H=Disclosures, I=Notes
 function parsePlayableWorlds(wb, apiRows) {
     const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('playable'));
     if (!sheetName) {
@@ -332,7 +345,7 @@ function parsePlayableWorlds(wb, apiRows) {
 
         const stability = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 1 }));
         const prStatus = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 2 }));
-        const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 4 }));
+        const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 3 }));
 
         // Use Sheets API data for links/notes if available, fallback to XLSX
         let linksData, notesData;
@@ -340,13 +353,14 @@ function parsePlayableWorlds(wb, apiRows) {
         const apiValues = apiRow?.values;
 
         if (apiValues) {
-            linksData = extractApiCellLinks(apiValues[3]); // Column D
-            notesData = extractApiCellLinks(apiValues[5]); // Column F
+            // Columns E (Links & Downloads), F (Setup Guides), G (Support)
+            linksData = mergeLinkData([4, 5, 6].map(i => extractApiCellLinks(apiValues[i])));
+            notesData = extractApiCellLinks(apiValues[8]); // Column I
         } else {
-            const linksCell = ws[XLSX.utils.encode_cell({ r: row, c: 3 })];
-            const notesCell = ws[XLSX.utils.encode_cell({ r: row, c: 5 })];
-            linksData = extractCellLinks(linksCell);
-            notesData = extractCellLinks(notesCell);
+            linksData = mergeLinkData([4, 5, 6].map(
+                c => extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c })])
+            ));
+            notesData = extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c: 8 })]);
         }
 
         games.push({
@@ -422,7 +436,7 @@ function parseCoreVerified(wb) {
 }
 
 // Parse Tools sheet from XLSX workbook + optional Sheets API data
-// Columns: A=Game, B=Type, C=Links & Downloads, D=18+/Unrated, E=Notes
+// Columns: A=Game, B=Type, C=18+/Unrated, D=Links & Downloads, E=Support, F=Disclosures, G=Notes
 function parseTools(wb, apiRows) {
     const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('tools'));
     if (!sheetName) {
@@ -442,7 +456,7 @@ function parseTools(wb, apiRows) {
         const toolType = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 1 }));
         if (!toolType) continue; // Skip rows without a type
 
-        const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 3 }));
+        const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 2 }));
 
         // Use Sheets API data for links/notes if available, fallback to XLSX
         let linksData, notesData;
@@ -450,13 +464,14 @@ function parseTools(wb, apiRows) {
         const apiValues = apiRow?.values;
 
         if (apiValues) {
-            linksData = extractApiCellLinks(apiValues[2]); // Column C
-            notesData = extractApiCellLinks(apiValues[4]); // Column E
+            // Columns D (Links & Downloads), E (Support)
+            linksData = mergeLinkData([3, 4].map(i => extractApiCellLinks(apiValues[i])));
+            notesData = extractApiCellLinks(apiValues[6]); // Column G
         } else {
-            const linksCell = ws[XLSX.utils.encode_cell({ r: row, c: 2 })];
-            const notesCell = ws[XLSX.utils.encode_cell({ r: row, c: 4 })];
-            linksData = extractCellLinks(linksCell);
-            notesData = extractCellLinks(notesCell);
+            linksData = mergeLinkData([3, 4].map(
+                c => extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c })])
+            ));
+            notesData = extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c: 6 })]);
         }
 
         tools.push({

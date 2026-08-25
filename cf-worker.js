@@ -20,7 +20,7 @@ export default {
                     client_secret: env.DISCORD_CLIENT_SECRET,
                     grant_type: 'authorization_code',
                     code,
-                    redirect_uri: `${env.WORKER_URL}/discord/callback`
+                    redirect_uri: `${new URL(request.url).origin}/discord/callback`
                 })
             });
 
