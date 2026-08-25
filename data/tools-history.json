@@ -234,5 +234,29 @@
   "Zelda Hub": {
     "addedDate": "2026-06-10T13:21:33.045Z",
     "firstSeen": "2026-06-10T13:21:33.045Z"
+  },
+  "Archipelago Setup Tool": {
+    "addedDate": "2026-06-22T17:37:01.344Z",
+    "firstSeen": "2026-06-22T17:37:01.344Z"
+  },
+  "StatusLock": {
+    "addedDate": "2026-07-03T21:10:52.050Z",
+    "firstSeen": "2026-07-03T21:10:52.050Z"
+  },
+  "Archipelago Visual Tracker (AVT)": {
+    "addedDate": "2026-07-12T13:27:01.463Z",
+    "firstSeen": "2026-07-12T13:27:01.463Z"
+  },
+  "Logic Test": {
+    "addedDate": "2026-08-02T17:03:06.157Z",
+    "firstSeen": "2026-08-02T17:03:06.157Z"
+  },
+  "LovenseAP": {
+    "addedDate": "2026-08-02T17:03:06.157Z",
+    "firstSeen": "2026-08-02T17:03:06.157Z"
+  },
+  "Torture Client": {
+    "addedDate": "2026-08-02T17:03:06.157Z",
+    "firstSeen": "2026-08-02T17:03:06.157Z"
   }
 }
