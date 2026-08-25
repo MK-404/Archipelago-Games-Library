@@ -84,6 +84,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             closeModal();
         }
     });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+
+        if (ageVerificationModal.classList.contains('active')) {
+            denyAge();
+        } else if (toolModal.classList.contains('active')) {
+            closeModal();
+        }
+    });
 });
 
 // Load pre-built tools data
