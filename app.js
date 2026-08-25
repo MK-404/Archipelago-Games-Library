@@ -52,6 +52,10 @@ const modalStatus = document.getElementById('modalStatus');
 const modalPrStatus = document.getElementById('modalPrStatus');
 const modalLinksSection = document.getElementById('modalLinksSection');
 const modalLinks = document.getElementById('modalLinks');
+const modalSetupSection = document.getElementById('modalSetupSection');
+const modalSetup = document.getElementById('modalSetup');
+const modalSupportSection = document.getElementById('modalSupportSection');
+const modalSupport = document.getElementById('modalSupport');
 const modalNotesSection = document.getElementById('modalNotesSection');
 const modalNotes = document.getElementById('modalNotes');
 
@@ -488,12 +492,12 @@ function getIconForUrl(url) {
     return '<span class="button-icon-text">&#128279;</span>';
 }
 
-// Parse download links from game.links field
-function parseDownloadLinks(game) {
+// Parse a {text, links} field into a flat list of usable links
+function parseLinkField(field) {
     const links = [];
 
-    if (game.links && game.links.links && game.links.links.length > 0) {
-        game.links.links.forEach(link => {
+    if (field && field.links && field.links.length > 0) {
+        field.links.forEach(link => {
             if (link.url) {
                 links.push({
                     label: link.text || 'Link',
@@ -504,6 +508,31 @@ function parseDownloadLinks(game) {
     }
 
     return links;
+}
+
+// Render a modal link section, hiding it when there is nothing to show
+function renderLinkSection(sectionEl, containerEl, field) {
+    if (!sectionEl || !containerEl) return;
+
+    const links = parseLinkField(field);
+
+    if (links.length === 0) {
+        sectionEl.style.display = 'none';
+        return;
+    }
+
+    containerEl.innerHTML = '';
+    links.forEach(link => {
+        const linkElement = document.createElement('a');
+        linkElement.className = 'modal-link';
+        linkElement.href = link.url;
+        linkElement.target = '_blank';
+        linkElement.rel = 'noopener noreferrer';
+        linkElement.innerHTML = `${getIconForUrl(link.url)} ${escapeHtml(link.label)}`;
+        linkElement.title = link.url;
+        containerEl.appendChild(linkElement);
+    });
+    sectionEl.style.display = 'block';
 }
 
 // Convert notes text with links to HTML
@@ -645,28 +674,10 @@ async function openGameModal(game) {
         modalBanner.classList.add('no-banner');
     }
 
-    // Parse and display download links
-    const downloadLinks = parseDownloadLinks(game);
-
-    if (downloadLinks.length > 0) {
-        modalLinks.innerHTML = '';
-        downloadLinks.forEach(link => {
-            const linkElement = document.createElement('a');
-            linkElement.className = 'modal-link';
-            linkElement.href = link.url;
-            linkElement.target = '_blank';
-            linkElement.rel = 'noopener noreferrer';
-
-            const icon = getIconForUrl(link.url);
-            linkElement.innerHTML = `${icon} ${escapeHtml(link.label)}`;
-            linkElement.title = link.url;
-
-            modalLinks.appendChild(linkElement);
-        });
-        modalLinksSection.style.display = 'block';
-    } else {
-        modalLinksSection.style.display = 'none';
-    }
+    // Downloads, setup guides and support each get their own section
+    renderLinkSection(modalLinksSection, modalLinks, game.links);
+    renderLinkSection(modalSetupSection, modalSetup, game.setupGuides);
+    renderLinkSection(modalSupportSection, modalSupport, game.support);
 
     // Display notes with inline clickable links
     const formattedNotes = formatNotesWithLinks(game);

@@ -22,6 +22,8 @@ const modalTitle = document.getElementById('modalTitle');
 const modalType = document.getElementById('modalType');
 const modalLinksSection = document.getElementById('modalLinksSection');
 const modalLinks = document.getElementById('modalLinks');
+const modalSupportSection = document.getElementById('modalSupportSection');
+const modalSupport = document.getElementById('modalSupport');
 const modalNotesSection = document.getElementById('modalNotesSection');
 const modalNotes = document.getElementById('modalNotes');
 
@@ -368,11 +370,11 @@ function getIconForUrl(url) {
     return '<span class="button-icon-text">&#128279;</span>';
 }
 
-function parseToolLinks(tool) {
+function parseLinkField(field) {
     const links = [];
 
-    if (tool.links && tool.links.links && tool.links.links.length > 0) {
-        tool.links.links.forEach(link => {
+    if (field && field.links && field.links.length > 0) {
+        field.links.forEach(link => {
             if (link.url) {
                 links.push({
                     label: link.text || 'Link',
@@ -383,6 +385,31 @@ function parseToolLinks(tool) {
     }
 
     return links;
+}
+
+// Render a modal link section, hiding it when there is nothing to show
+function renderLinkSection(sectionEl, containerEl, field) {
+    if (!sectionEl || !containerEl) return;
+
+    const links = parseLinkField(field);
+
+    if (links.length === 0) {
+        sectionEl.style.display = 'none';
+        return;
+    }
+
+    containerEl.innerHTML = '';
+    links.forEach(link => {
+        const linkElement = document.createElement('a');
+        linkElement.className = 'modal-link';
+        linkElement.href = link.url;
+        linkElement.target = '_blank';
+        linkElement.rel = 'noopener noreferrer';
+        linkElement.innerHTML = `${getIconForUrl(link.url)} ${escapeHtml(link.label)}`;
+        linkElement.title = link.url;
+        containerEl.appendChild(linkElement);
+    });
+    sectionEl.style.display = 'block';
 }
 
 function formatNotesWithLinks(tool) {
@@ -460,28 +487,9 @@ function openToolModal(tool) {
     modalBanner.style.backgroundImage = '';
     modalBanner.classList.add('no-banner');
 
-    // Parse and display links
-    const toolLinks = parseToolLinks(tool);
-
-    if (toolLinks.length > 0) {
-        modalLinks.innerHTML = '';
-        toolLinks.forEach(link => {
-            const linkElement = document.createElement('a');
-            linkElement.className = 'modal-link';
-            linkElement.href = link.url;
-            linkElement.target = '_blank';
-            linkElement.rel = 'noopener noreferrer';
-
-            const icon = getIconForUrl(link.url);
-            linkElement.innerHTML = `${icon} ${escapeHtml(link.label)}`;
-            linkElement.title = link.url;
-
-            modalLinks.appendChild(linkElement);
-        });
-        modalLinksSection.style.display = 'block';
-    } else {
-        modalLinksSection.style.display = 'none';
-    }
+    // Links and support each get their own section
+    renderLinkSection(modalLinksSection, modalLinks, tool.links);
+    renderLinkSection(modalSupportSection, modalSupport, tool.support);
 
     // Display notes
     const formattedNotes = formatNotesWithLinks(tool);

@@ -270,18 +270,6 @@ function extractCellLinks(cell) {
     return { text, links };
 }
 
-// Merge several {text, links} cell results into one
-function mergeLinkData(parts) {
-    const texts = [];
-    const links = [];
-    for (const part of parts) {
-        if (!part) continue;
-        if (part.text) texts.push(part.text);
-        if (part.links) links.push(...part.links);
-    }
-    return { text: texts.join(', '), links };
-}
-
 // Check if a row is an instruction/header row (skip it)
 function isInstructionRow(name) {
     if (!name || name.length <= 1) return true;
@@ -347,27 +335,35 @@ function parsePlayableWorlds(wb, apiRows) {
         const prStatus = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 2 }));
         const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 3 }));
 
-        // Use Sheets API data for links/notes if available, fallback to XLSX
-        let linksData, notesData;
         const apiRow = apiRows ? apiRows[row] : null;
         const apiValues = apiRow?.values;
 
+        // Use Sheets API data for links/notes if available, fallback to XLSX
+        let linksData, setupData, supportData, notesData;
+
         if (apiValues) {
-            // Columns E (Links & Downloads), F (Setup Guides), G (Support)
-            linksData = mergeLinkData([4, 5, 6].map(i => extractApiCellLinks(apiValues[i])));
-            notesData = extractApiCellLinks(apiValues[8]); // Column I
+            linksData = extractApiCellLinks(apiValues[4]);   // Column E
+            setupData = extractApiCellLinks(apiValues[5]);   // Column F
+            supportData = extractApiCellLinks(apiValues[6]); // Column G
+            notesData = extractApiCellLinks(apiValues[8]);   // Column I
         } else {
-            linksData = mergeLinkData([4, 5, 6].map(
-                c => extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c })])
-            ));
-            notesData = extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c: 8 })]);
+            const cellAt = c => extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c })]);
+            linksData = cellAt(4);
+            setupData = cellAt(5);
+            supportData = cellAt(6);
+            notesData = cellAt(8);
         }
+
+        const disclosures = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 7 }));
 
         games.push({
             name,
             stability,
             prStatus,
             links: linksData,
+            setupGuides: setupData,
+            support: supportData,
+            disclosures,
             isAdult,
             notes: notesData,
             status: stability,
@@ -399,29 +395,24 @@ function parseCoreVerified(wb) {
         const name = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 0 }));
         if (isInstructionRow(name)) continue;
 
-        // Build links from columns B, C, D (each has a hyperlink)
-        const links = [];
+        // Columns B (Game Page), C (Setup Guide), D (Discord Channel) - each has a hyperlink
         const colLabels = ['Game Page', 'Setup Guide', 'Discord Channel'];
-        for (let c = 1; c <= 3; c++) {
+        const linkAt = (c) => {
             const cell = ws[XLSX.utils.encode_cell({ r: row, c })];
-            if (cell && cell.l) {
-                const url = cell.l.Target || (cell.l.Rel && cell.l.Rel.Target) || '';
-                if (url) {
-                    links.push({
-                        text: colLabels[c - 1],
-                        url: url.replace(/&amp;/g, '&')
-                    });
-                }
-            }
-        }
-
-        const linkTexts = links.map(l => l.text).join(', ');
+            const url = cell && cell.l ? (cell.l.Target || (cell.l.Rel && cell.l.Rel.Target) || '') : '';
+            if (!url) return { text: '', links: [] };
+            const label = colLabels[c - 1];
+            return { text: label, links: [{ text: label, url: url.replace(/&amp;/g, '&') }] };
+        };
 
         games.push({
             name,
             stability: 'Stable',
             prStatus: 'Merged',
-            links: { text: linkTexts, links },
+            links: linkAt(1),
+            setupGuides: linkAt(2),
+            support: linkAt(3),
+            disclosures: '',
             isAdult: false,
             notes: { text: '', links: [] },
             status: 'Stable',
@@ -459,25 +450,29 @@ function parseTools(wb, apiRows) {
         const isAdult = getCellBool(ws, XLSX.utils.encode_cell({ r: row, c: 2 }));
 
         // Use Sheets API data for links/notes if available, fallback to XLSX
-        let linksData, notesData;
+        let linksData, supportData, notesData;
         const apiRow = apiRows ? apiRows[row] : null;
         const apiValues = apiRow?.values;
 
         if (apiValues) {
-            // Columns D (Links & Downloads), E (Support)
-            linksData = mergeLinkData([3, 4].map(i => extractApiCellLinks(apiValues[i])));
-            notesData = extractApiCellLinks(apiValues[6]); // Column G
+            linksData = extractApiCellLinks(apiValues[3]);   // Column D
+            supportData = extractApiCellLinks(apiValues[4]); // Column E
+            notesData = extractApiCellLinks(apiValues[6]);   // Column G
         } else {
-            linksData = mergeLinkData([3, 4].map(
-                c => extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c })])
-            ));
-            notesData = extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c: 6 })]);
+            const cellAt = c => extractCellLinks(ws[XLSX.utils.encode_cell({ r: row, c })]);
+            linksData = cellAt(3);
+            supportData = cellAt(4);
+            notesData = cellAt(6);
         }
+
+        const disclosures = getCellText(ws, XLSX.utils.encode_cell({ r: row, c: 5 }));
 
         tools.push({
             name,
             toolType,
             links: linksData,
+            support: supportData,
+            disclosures,
             isAdult,
             notes: notesData
         });
@@ -689,7 +684,7 @@ async function build() {
         if (playableSheet) {
             const ws = wb.Sheets[playableSheet];
             const range = XLSX.utils.decode_range(ws['!ref']);
-            const apiRange = `A1:F${range.e.r + 1}`;
+            const apiRange = `A1:I${range.e.r + 1}`;
             console.log(`  Fetching ${playableSheet} (${apiRange})...`);
             playableApiRows = await fetchSheetLinks(playableSheet, apiRange);
             if (playableApiRows) {
@@ -700,7 +695,7 @@ async function build() {
         if (toolsSheet) {
             const ws = wb.Sheets[toolsSheet];
             const range = XLSX.utils.decode_range(ws['!ref']);
-            const apiRange = `A1:E${range.e.r + 1}`;
+            const apiRange = `A1:G${range.e.r + 1}`;
             console.log(`  Fetching ${toolsSheet} (${apiRange})...`);
             toolsApiRows = await fetchSheetLinks(toolsSheet, apiRange);
             if (toolsApiRows) {
