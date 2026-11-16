@@ -968,7 +968,8 @@ async function build() {
 }
 
 // Run build
-build().catch(error => {
+// exit explicitly: open keep-alive sockets from image downloads can keep Node running for minutes
+build().then(() => process.exit(0)).catch(error => {
     console.error('\nBuild failed:', error);
     process.exit(1);
 });
