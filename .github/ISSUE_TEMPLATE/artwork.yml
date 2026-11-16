@@ -1,0 +1,49 @@
+name: Cover / banner
+description: Send a new or better cover or banner for a game or tool
+title: "[Artwork] "
+labels: ["artwork"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping! Once the image is approved it goes live on the site automatically.
+
+        **Cover:** vertical, 2:3 ratio (ideally 600×900).
+        **Banner:** horizontal, wide (ideally 1920×620).
+        PNG, JPG or WEBP, max 5 MB. Drag the image into the box below, or paste a direct link from SteamGridDB (`cdn2.steamgriddb.com/...`).
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      description: Exactly as shown on the site
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Page
+      options:
+        - Game
+        - Tool
+    validations:
+      required: true
+  - type: textarea
+    id: cover
+    attributes:
+      label: Cover
+      description: Drop the cover image here (leave empty if you're only sending a banner)
+  - type: textarea
+    id: banner
+    attributes:
+      label: Banner
+      description: Drop the banner image here (leave empty if you're only sending a cover)
+  - type: input
+    id: credit
+    attributes:
+      label: Credit name
+      description: How you'd like to be credited in the commit (leave empty to use your GitHub username)
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Optional, e.g. "the current cover is from the wrong game"

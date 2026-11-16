@@ -283,7 +283,10 @@ function openToolModal(tool) {
     content.classList.add(cls);
 
     $('modalTitle').textContent = tool.name;
-    $('modalBanner').style.setProperty('--art', `url(${art})`);
+    const banner = $('modalBanner');
+    banner.style.setProperty('--art', `url(${art})`);
+    banner.style.backgroundImage = tool.bannerPath ? `url("${tool.bannerPath}")` : '';
+    banner.classList.toggle('no-banner', !tool.bannerPath);
     $('modalPoster').innerHTML = tool.coverPath
         ? `<img src="${UI.esc(tool.coverPath)}" alt="">`
         : `<div class="tool-cover-placeholder" style="--art:url(${art})"><span class="tool-icon">${UI.ICONS[icon]}</span></div>`;
@@ -298,6 +301,7 @@ function openToolModal(tool) {
     $('factType').textContent = tool.toolType || '—';
     $('factAdded').textContent = fmtDate(tool.addedDate);
     UI.fillAiDisclosure($('factAiRow'), $('factAiNote'), tool.disclosures);
+    UI.fillArtworkLink($('artworkLink'), tool.name, 'Tool', !tool.coverPath || !tool.bannerPath);
 
     const links = renderLinkSection('modalLinksSection', 'modalLinks', tool.links, true);
     renderLinkSection('modalSupportSection', 'modalSupport', tool.support, false);

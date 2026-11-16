@@ -303,6 +303,9 @@ button { font: inherit; color: inherit; }
 .ai-fact dd { display: inline-flex; align-items: center; gap: 6px; }
 .ai-fact dd::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ai); }
 .ai-note { margin: -4px 0 0; font: 400 12.5px/1.45 var(--font-ui); color: var(--ink-3); }
+.artwork-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; font: 500 12.5px/1.4 var(--font-ui); color: var(--ink-3); text-decoration: none; }
+.artwork-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.artwork-link svg { width: 14px; height: 14px; flex: none; }
 .modal-main { display: grid; grid-template-columns: 1fr 1fr; gap: 22px var(--space-18); align-content: start; }
 .modal-section { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
 .modal-section.wide, #modalSupportSection, #modalNotesSection { grid-column: 1 / -1; }

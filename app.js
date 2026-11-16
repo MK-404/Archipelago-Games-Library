@@ -424,6 +424,8 @@ function openGameModal(game) {
     $('factPr').textContent = game.prStatus && game.prStatus !== '--' ? game.prStatus : '—';
     $('factAdded').textContent = fmtDate(game.addedDate);
     UI.fillAiDisclosure($('factAiRow'), $('factAiNote'), game.disclosures);
+    const isDefault = p => !p || p.endsWith('_default.png');
+    UI.fillArtworkLink($('artworkLink'), game.name, 'Game', isDefault(game.coverPath) || isDefault(game.bannerPath));
 
     const downloads = renderLinkSection('modalLinksSection', 'modalLinks', game.links, true);
     renderLinkSection('modalSetupSection', 'modalSetup', game.setupGuides, false);

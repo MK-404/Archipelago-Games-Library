@@ -1,0 +1,66 @@
+name: Apply approved artwork
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: artwork
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    # only when the repo owner adds "approved" to an artwork issue
+    if: >-
+      github.event.label.name == 'approved' &&
+      github.event.sender.login == github.repository_owner &&
+      contains(github.event.issue.labels.*.name, 'artwork')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download and save image
+        id: apply
+        continue-on-error: true
+        run: node build/apply-artwork.js
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+
+      - name: Report failure
+        if: steps.apply.outcome == 'failure'
+        run: |
+          msg=$(node -p "require('./artwork-result.json').error || 'Unknown error'")
+          gh issue comment "$ISSUE" --body "Couldn't apply this artwork: $msg"
+          gh issue edit "$ISSUE" --remove-label approved
+          exit 1
+
+      - name: Commit and push
+        run: |
+          node -p "require('./artwork-result.json').commitMessage" > "$RUNNER_TEMP/msg.txt"
+          echo "" >> "$RUNNER_TEMP/msg.txt"
+          echo "closes #$ISSUE" >> "$RUNNER_TEMP/msg.txt"
+          rm artwork-result.json
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add data/covers data/banners
+          git commit -F "$RUNNER_TEMP/msg.txt"
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
+
+      - name: Redeploy site and thank the author
+        run: |
+          gh workflow run deploy.yml --ref main
+          gh issue comment "$ISSUE" --body "Thanks @${{ github.event.issue.user.login }}! The new artwork will be live on the site in a few minutes."
+          gh issue close "$ISSUE" --reason completed

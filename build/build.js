@@ -734,6 +734,11 @@ async function build() {
     const uniqueTools = [...new Map(allToolsRaw.map(t => [t.name, t])).values()];
     uniqueTools.sort((a, b) => a.name.localeCompare(b.name));
     console.log(`Total unique tools: ${uniqueTools.length}`);
+    // tools only use artwork that was sent in by hand (no SteamGridDB lookup)
+    for (const tool of uniqueTools) {
+        tool.coverPath = hasExistingCover(tool);
+        tool.bannerPath = hasExistingBanner(tool);
+    }
 
     // === Game history ===
     console.log('\n=== Updating Game History ===\n');
