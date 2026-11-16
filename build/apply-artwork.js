@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { toWebp } = require('./optimize-images');
 
 const ROOT = path.join(__dirname, '..');
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -83,9 +84,10 @@ async function main() {
 
     const saved = [];
     for (const [kind, dir] of jobs) {
-        const { buf, ext } = await download(findImageUrl(fields[kind]));
+        const { buf } = await download(findImageUrl(fields[kind]));
+        const webp = await toWebp(buf, kind === 'cover' ? 'covers' : 'banners');
         for (const old of EXTS) fs.rmSync(path.join(ROOT, dir, base + old), { force: true });
-        fs.writeFileSync(path.join(ROOT, dir, base + ext), buf);
+        fs.writeFileSync(path.join(ROOT, dir, base + '.webp'), webp);
         saved.push(kind);
     }
 

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { optimizeFile, optimizeAll } = require('./optimize-images');
 const https = require('https');
 const http = require('http');
 const XLSX = require('xlsx');
@@ -537,7 +538,7 @@ function sanitizeFilename(name) {
 // Check if a game already has a cover
 function hasExistingCover(game) {
     const sanitizedName = sanitizeFilename(game.name);
-    const possibleExtensions = ['.jpg', '.png', '.webp', '.jpeg'];
+    const possibleExtensions = ['.webp', '.jpg', '.png', '.jpeg'];
     for (const ext of possibleExtensions) {
         const testPath = path.join(CONFIG.COVERS_DIR, sanitizedName + ext);
         if (fs.existsSync(testPath)) {
@@ -550,7 +551,7 @@ function hasExistingCover(game) {
 // Check if a game already has a banner
 function hasExistingBanner(game) {
     const sanitizedName = sanitizeFilename(game.name);
-    const possibleExtensions = ['.jpg', '.png', '.webp', '.jpeg'];
+    const possibleExtensions = ['.webp', '.jpg', '.png', '.jpeg'];
     for (const ext of possibleExtensions) {
         const testPath = path.join(CONFIG.BANNERS_DIR, sanitizedName + ext);
         if (fs.existsSync(testPath)) {
@@ -596,9 +597,10 @@ async function fetchGameBanner(game) {
 
         console.log(`    Downloading banner...`);
         await downloadImage(banner.url, filepath);
-        console.log(`    Saved: ${filename}`);
+        const webp = await optimizeFile(filepath, 'banners').then(() => `${sanitizedName}.webp`, () => filename);
+        console.log(`    Saved: ${webp}`);
 
-        return { url: banner.url, path: `data/banners/${filename}` };
+        return { url: banner.url, path: `data/banners/${webp}` };
     } catch (error) {
         console.log(`    Error: ${error.message}`);
         return null;
@@ -643,9 +645,10 @@ async function fetchGameCover(game) {
 
         console.log(`    Downloading cover...`);
         await downloadImage(cover.url, filepath);
-        console.log(`    Saved: ${filename}`);
+        const webp = await optimizeFile(filepath, 'covers').then(() => `${sanitizedName}.webp`, () => filename);
+        console.log(`    Saved: ${webp}`);
 
-        return { url: cover.url, path: `data/covers/${filename}` };
+        return { url: cover.url, path: `data/covers/${webp}` };
     } catch (error) {
         console.log(`    Error: ${error.message}`);
         return null;
@@ -784,6 +787,10 @@ async function build() {
     });
 
     saveHistory(toolsHistory, CONFIG.TOOLS_HISTORY_JSON);
+
+    // === Convert any image added by hand (PRs, artwork issues) to WEBP ===
+    console.log('\n=== Optimizing Images ===\n');
+    await optimizeAll();
 
     // === Fetch covers ===
     console.log('\n=== Checking Existing Covers ===\n');

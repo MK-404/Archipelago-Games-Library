@@ -21,6 +21,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.changes.outputs.deploy }}
 
     steps:
       - name: Checkout repository
@@ -29,10 +31,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run build script
         run: npm run build
@@ -42,21 +45,54 @@ jobs:
           GOOGLE_SHEETS_API_KEY: ${{ secrets.GOOGLE_SHEETS_API_KEY }}
 
       - name: Commit updated files
+        id: commit
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Update game history and new covers/banners"
-          file_pattern: "data/game-history.json data/tools-history.json data/covers/* data/banners/*"
+          file_pattern: "data/game-history.json data/tools-history.json data/covers data/banners"
           commit_user_name: "GitHub Actions Bot"
           commit_user_email: "actions@github.com"
           commit_author: "GitHub Actions Bot <actions@github.com>"
           skip_dirty_check: false
 
+      # Scheduled runs skip the deploy when the data is identical to what's live
+      - name: Check for changes
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          deploy=true
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ steps.commit.outputs.changes_detected }}" != "true" ]; then
+            live=$(gh api "repos/${{ github.repository }}/pages" --jq .html_url)
+            same=true
+            for f in games tools; do
+              curl -sf "${live%/}/data/$f.json" | jq -S 'del(.generated)' > "$RUNNER_TEMP/live.json" || { same=false; break; }
+              jq -S 'del(.generated)' "data/$f.json" > "$RUNNER_TEMP/new.json"
+              cmp -s "$RUNNER_TEMP/live.json" "$RUNNER_TEMP/new.json" || { same=false; break; }
+            done
+            if [ "$same" = true ]; then deploy=false; echo "Nothing changed since the last deploy, skipping."; fi
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
+      # Only the files the site needs (no build scripts, node_modules, configs)
+      - name: Collect site files
+        if: steps.changes.outputs.deploy == 'true'
+        run: |
+          rsync -a ./ _site/ \
+            --exclude .git --exclude .github --exclude .claude --exclude .vscode \
+            --exclude node_modules --exclude build --exclude extract --exclude v2 --exclude _site \
+            --exclude package.json --exclude package-lock.json --exclude cf-worker.js \
+            --exclude todo.txt --exclude .gitignore
+          du -sh _site
+
       - name: Upload artifact
+        if: steps.changes.outputs.deploy == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
   deploy:
+    if: needs.build.outputs.deploy == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
