@@ -191,6 +191,8 @@ function sortTools(tools, sortOption) {
                 const aIsNew = a.isNew === true;
                 const bIsNew = b.isNew === true;
                 if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
+                // new tools: most recently added first
+                if (aIsNew) return (byDate(b) - byDate(a)) || a.name.localeCompare(b.name);
                 return a.name.localeCompare(b.name);
             });
             break;

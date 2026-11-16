@@ -224,6 +224,8 @@ function sortGames(games, sortOption) {
                 const bFav = currentUser && userFavorites.includes(b.name);
                 if (aFav !== bFav) return aFav ? -1 : 1;
                 if (isGameNew(a) !== isGameNew(b)) return isGameNew(a) ? -1 : 1;
+                // new games: most recently added first
+                if (isGameNew(a)) return (byDate(b) - byDate(a)) || a.name.localeCompare(b.name);
                 return a.name.localeCompare(b.name);
             });
             break;
