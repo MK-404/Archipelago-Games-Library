@@ -258,5 +258,33 @@
   "Torture Client": {
     "addedDate": "2026-08-02T17:03:06.157Z",
     "firstSeen": "2026-08-02T17:03:06.157Z"
+  },
+  "Generate Until Successful": {
+    "addedDate": "2026-08-25T12:52:52.145Z",
+    "firstSeen": "2026-08-25T12:52:52.145Z"
+  },
+  "A YAML Editor": {
+    "addedDate": "2026-09-01T22:28:25.244Z",
+    "firstSeen": "2026-09-01T22:28:25.244Z"
+  },
+  "Region Mapper": {
+    "addedDate": "2026-09-01T22:28:25.244Z",
+    "firstSeen": "2026-09-01T22:28:25.244Z"
+  },
+  "Waystone": {
+    "addedDate": "2026-09-08T22:28:32.432Z",
+    "firstSeen": "2026-09-08T22:28:32.432Z"
+  },
+  "ArchipelaDOS": {
+    "addedDate": "2026-09-16T22:44:55.118Z",
+    "firstSeen": "2026-09-16T22:44:55.118Z"
+  },
+  "DeathLink Meta Yaml Tool": {
+    "addedDate": "2026-10-28T04:45:37.524Z",
+    "firstSeen": "2026-10-28T04:45:37.524Z"
+  },
+  "DME Dolphin Switcher": {
+    "addedDate": "2026-11-12T16:40:42.537Z",
+    "firstSeen": "2026-11-12T16:40:42.537Z"
   }
 }
