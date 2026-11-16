@@ -293,6 +293,16 @@ button { font: inherit; color: inherit; }
 .modal-facts div { display: flex; justify-content: space-between; gap: var(--space-8); padding-bottom: var(--space-8); border-bottom: 1px solid var(--glass-line); }
 .modal-facts dt { color: var(--ink-3); }
 .modal-facts dd { margin: 0; font-weight: 600; color: var(--ink); text-align: right; }
+.modal-facts div[hidden], .ai-note[hidden] { display: none; }
+/* AI disclosure row — dot colour per level */
+.ai-fact { --ai: var(--ink-3); }
+.ai-fact[data-ai="None"] { --ai: var(--st-stable); }
+.ai-fact[data-ai="Consulted"] { --ai: var(--hint); }
+.ai-fact[data-ai="Minor"] { --ai: var(--st-unstable); }
+.ai-fact[data-ai="Major"] { --ai: var(--adult); }
+.ai-fact dd { display: inline-flex; align-items: center; gap: 6px; }
+.ai-fact dd::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ai); }
+.ai-note { margin: -4px 0 0; font: 400 12.5px/1.45 var(--font-ui); color: var(--ink-3); }
 .modal-main { display: grid; grid-template-columns: 1fr 1fr; gap: 22px var(--space-18); align-content: start; }
 .modal-section { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
 .modal-section.wide, #modalSupportSection, #modalNotesSection { grid-column: 1 / -1; }

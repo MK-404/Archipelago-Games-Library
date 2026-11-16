@@ -296,8 +296,8 @@ function openToolModal(tool) {
     $('modalAdded').textContent = tool.addedDate ? 'Added ' + fmtDate(tool.addedDate) : '';
 
     $('factType').textContent = tool.toolType || '—';
-    $('factDisclosures').textContent = tool.disclosures || '—';
     $('factAdded').textContent = fmtDate(tool.addedDate);
+    UI.fillAiDisclosure($('factAiRow'), $('factAiNote'), tool.disclosures);
 
     const links = renderLinkSection('modalLinksSection', 'modalLinks', tool.links, true);
     renderLinkSection('modalSupportSection', 'modalSupport', tool.support, false);

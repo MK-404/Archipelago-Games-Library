@@ -423,6 +423,7 @@ function openGameModal(game) {
     $('factStatus').textContent = stability || '—';
     $('factPr').textContent = game.prStatus && game.prStatus !== '--' ? game.prStatus : '—';
     $('factAdded').textContent = fmtDate(game.addedDate);
+    UI.fillAiDisclosure($('factAiRow'), $('factAiNote'), game.disclosures);
 
     const downloads = renderLinkSection('modalLinksSection', 'modalLinks', game.links, true);
     renderLinkSection('modalSetupSection', 'modalSetup', game.setupGuides, false);

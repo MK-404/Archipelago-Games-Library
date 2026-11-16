@@ -44,6 +44,26 @@ export function statusOf(stability = '') {
   return ['border-green', 'Stable', 'stable'];
 }
 /** toolType → [class, label, icon key, art hue] */
+// AI disclosure levels (spreadsheet "Disclosures" column)
+export const AI_DISCLOSURES = {
+  None: 'No generative AI was used to make this integration.',
+  Consulted: 'AI was only consulted for questions or research. No AI-written code or assets are included.',
+  Minor: 'Small parts were made with AI help, such as code snippets or boilerplate.',
+  Major: 'A significant part of the code or assets was generated with AI.',
+  Unknown: "The developer hasn't said whether AI was used.",
+};
+
+// fills the "AI use" fact row + note; hides both when there's no value
+export function fillAiDisclosure(row, note, value) {
+  const level = (value || '').trim();
+  row.hidden = note.hidden = !level;
+  if (!level) return;
+  row.dataset.ai = level in AI_DISCLOSURES ? level : 'Unknown';
+  row.querySelector('dd').textContent = level;
+  note.textContent = AI_DISCLOSURES[level] || '';
+  note.hidden = !note.textContent;
+}
+
 export const TOOL_TYPES = {
   'Tool': ['border-blue', 'Tool', 'tool', 210],
   'Meta Game': ['border-purple', 'Meta Game', 'meta', 250],
