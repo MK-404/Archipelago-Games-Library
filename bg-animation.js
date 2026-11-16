@@ -31,6 +31,8 @@ const EGG_LIST = 'easter-eggs/list.json';
 const EGG_DIR = 'easter-eggs/';
 const EGG_CHANCE = 0.02;
 const FPS = 30;              // slow motion: 30fps is plenty and halves the work
+const RISE = 'stagger-bounce'; // islands emerging as they scroll into view: 'tide' | 'stagger' | 'bounce' | 'stagger-bounce' | 'none'
+const SCROLL_SPEED = 1;       // how fast the map follows the page scroll (0 = fixed, 1 = same speed)
 const RENDER_SCALE = 0.5;    // canvas pixels per CSS pixel (soft by design)
 
 /* ------------------------------------------------------------------ utils */
@@ -476,21 +478,17 @@ function stars(env) {
 /* ------------------------------------------------------------------ concept: pixel
    A 16-bit overworld: seeded archipelago in chunky pixels, water shimmering by
    palette cycling, tiny boats sailing between islands. Redrawn at 10 fps on
-   purpose (it's pixel art) and blitted with nearest-neighbour scaling. */
+   purpose (it's pixel art) and blitted with nearest-neighbour scaling.
+   The map is endless vertically: it scrolls with the page (env.scrollSpeed) and
+   every stretch of map that comes into view rises out of the water (env.rise:
+   'tide' all together · 'stagger' island by island · 'bounce' overshoot + foam · 'none'). */
 function pixel(env) {
   const { W, H, theme, rnd, mobile } = env;
-  const cell = mobile ? 5 : 6, gw = Math.ceil(W / cell), gh = Math.ceil(H / cell);
+  const cell = mobile ? 5 : 6, gw = Math.ceil(W / cell), gh = Math.ceil(H / cell) + 1;
   const noise = makeNoise(rnd), sc = 1 / (22 + rnd() * 16), sea = 0.57 + rnd() * 0.05;
-  const h = new Float32Array(gw * gh), kind = new Uint8Array(gw * gh);
-  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
-    const v = noise(x * sc, y * sc) * 0.62 + noise(x * sc * 2.3 + 11, y * sc * 2.3 + 5) * 0.28 + noise(x * sc * 5 + 3, y * sc * 5 + 9) * 0.1;
-    h[y * gw + x] = v;
-  }
-  // 0 deep · 1 water · 2 shallow · 3 sand · 4 grass · 5 forest · 6 hill · 7 peak
-  for (let i = 0; i < h.length; i++) {
-    const v = h[i] - sea;
-    kind[i] = v < -0.09 ? 0 : v < -0.035 ? 1 : v < 0 ? 2 : v < 0.02 ? 3 : v < 0.07 ? 4 : v < 0.11 ? 5 : v < 0.15 ? 6 : 7;
-  }
+  const rise = env.rise || 'none', speed = env.scrollSpeed || 0;
+  const RISE = rise !== 'none', STAGGER = rise.includes('stagger'), BOUNCE = rise.includes('bounce');
+  const DUR = BOUNCE ? 1.5 : 1.6, DROP = 0.3, HALO = -0.09;
   const L = theme.bgL, S = theme.bgS, hu = theme.hue;
   const PAL = [
     [hu, S + 8, L + 1.5, 0], [hu, S + 10, L + 2.5, 0.45], [hu, S + 14, L + 5, 0.75], [hu + 28, 22, L + 10, 0.9],
@@ -498,48 +496,127 @@ function pixel(env) {
   ].map(([a, b, c, al]) => [...hslToRgb(a, b, c), Math.round(al * 255)]);
   const GLINT = [...hslToRgb(hu, S + 16, L + 10), 150], FOAM = [...hslToRgb(hu, 18, L + 16), 160], LIT = 1.12, SHADE = 0.86;
   const BOAT = [...hslToRgb(hu + 30, 25, L + 30), 230], WAKE = [...hslToRgb(hu, 20, L + 14), 140];
-  const grid = sprite(gw, gh), gg = grid.getContext('2d'), img = gg.createImageData(gw, gh), px = img.data;
-  const HASH = new Float32Array(gw * gh); for (let i = 0; i < HASH.length; i++) HASH[i] = rnd() * 400;
-  const boats = Array.from({ length: mobile ? 3 : 6 }, () => {
-    let x, y, tries = 0; do { x = rnd() * gw; y = rnd() * gh; tries++; } while (kind[(y | 0) * gw + (x | 0)] > 1 && tries < 200);
-    const a = rnd() * TAU; return { x, y, a, v: 0.9 + rnd() * 0.8 };
-  });
-  let tt = 0, acc = 0;
-  function paint() {
-    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
-      const i = y * gw + x, k = kind[i]; let c = PAL[k], f = 1;
-      if (k <= 2) {
-        // palette cycling: shallow water foams in slow waves, a few scattered pixels twinkle
-        if (k === 2 && Math.sin(tt * 0.9 - h[i] * 90) > 0.6) c = FOAM;
-        else if (k >= 1 && Math.sin(tt * 1.4 + HASH[i]) > 0.985) c = GLINT;
-      } else if (x > 0 && y > 0) {
-        const up = h[i - gw - 1]; f = h[i] - up > 0.004 ? LIT : up - h[i] > 0.004 ? SHADE : 1;
+  // 0 deep · 1 water · 2 shallow · 3 sand · 4 grass · 5 forest · 6 hill · 7 peak
+  const kindOf = (v) => v < -0.09 ? 0 : v < -0.035 ? 1 : v < 0 ? 2 : v < 0.02 ? 3 : v < 0.07 ? 4 : v < 0.11 ? 5 : v < 0.15 ? 6 : 7;
+  const hash = (x, r) => { const t = Math.sin(x * 127.1 + r * 311.7) * 43758.5453; return t - Math.floor(t); };
+
+  // The sprite holds the screen plus B spare rows above and below: scrolling just moves it.
+  // It's repainted at 10 fps (water, rising islands) or when the spare rows run out.
+  const B = 24, GH = gh + 2 * B;
+  const grid = sprite(gw, GH), gg = grid.getContext('2d'), img = gg.createImageData(gw, GH), px = img.data;
+
+  // Map rows are generated around the screen and dropped far away. An island (land plus the
+  // lighter water around it) rises as a whole the first time any part of it is on screen.
+  // The moment it started rising is stored per cell, so it never resets, however tall the
+  // island is or wherever the window around the screen cuts it.
+  const M = 60, rows = new Map(), born = new Map();
+  let tt = 0, acc = 0, off = 0, gbase = 0, labeledAt = NaN, intro = !env.rebuild, seenAny = false;
+  let winTop = 0, winH = 0, labels = new Int32Array(0), hs = null, stack = null, members = null, t0s = [];
+  function row(r) {
+    let R = rows.get(r);
+    if (R) return R;
+    R = new Float32Array(gw);
+    for (let x = 0; x < gw; x++) R[x] = noise(x * sc, r * sc) * 0.62 + noise(x * sc * 2.3 + 11, r * sc * 2.3 + 5) * 0.28 + noise(x * sc * 5 + 3, r * sc * 5 + 9) * 0.1;
+    rows.set(r, R);
+    return R;
+  }
+  function bornRow(r) {
+    let T = born.get(r);
+    if (!T) { T = new Float32Array(gw).fill(Infinity); born.set(r, T); }
+    return T;
+  }
+  function label() {
+    winTop = gbase - B - M; winH = GH + 2 * M;
+    for (const k of rows.keys()) if (k < winTop - 4 || k >= winTop + winH + 4) rows.delete(k);
+    const n = gw * winH;
+    if (labels.length !== n) { labels = new Int32Array(n); hs = new Float32Array(n); stack = new Int32Array(n); members = new Int32Array(n); }
+    for (let y = 0; y < winH; y++) hs.set(row(winTop + y), y * gw);
+    labels.fill(-1); t0s = [];
+    const scrTop = B + M, scrBot = B + M + gh, instant = !RISE || !env.animated || (!intro && !seenAny);
+    for (let i = 0; i < n; i++) {
+      if (labels[i] !== -1 || hs[i] - sea < HALO) continue;
+      const id = t0s.length; let sp = 0, cnt = 0, onScreen = false, t0 = Infinity;
+      labels[i] = id; stack[sp++] = i;
+      while (sp) {
+        const j = stack[--sp], y = (j / gw) | 0, x = j - y * gw;
+        members[cnt++] = j;
+        const b = bornRow(winTop + y)[x];
+        if (b < t0) t0 = b;
+        if (y >= scrTop && y < scrBot) onScreen = true;
+        if (x > 0 && labels[j - 1] === -1 && hs[j - 1] - sea >= HALO) { labels[j - 1] = id; stack[sp++] = j - 1; }
+        if (x < gw - 1 && labels[j + 1] === -1 && hs[j + 1] - sea >= HALO) { labels[j + 1] = id; stack[sp++] = j + 1; }
+        if (y > 0 && labels[j - gw] === -1 && hs[j - gw] - sea >= HALO) { labels[j - gw] = id; stack[sp++] = j - gw; }
+        if (y < winH - 1 && labels[j + gw] === -1 && hs[j + gw] - sea >= HALO) { labels[j + gw] = id; stack[sp++] = j + gw; }
       }
-      const o = i * 4; px[o] = Math.min(255, c[0] * f); px[o + 1] = Math.min(255, c[1] * f); px[o + 2] = Math.min(255, c[2] * f); px[o + 3] = c[3];
+      if (t0 === Infinity && onScreen) t0 = instant ? -99 : tt + (STAGGER ? rnd() * 1.1 : 0);
+      if (t0 !== Infinity) for (let m = 0; m < cnt; m++) { const j = members[m], y = (j / gw) | 0; bornRow(winTop + y)[j - y * gw] = t0; }
+      t0s.push(t0);
+    }
+    seenAny = true;
+  }
+  function liftOf(t0) {
+    if (!RISE || !env.animated) return 1;
+    if (t0 === Infinity) return 0;                  // not seen yet: under water
+    const p = clamp((tt - t0) / DUR, 0, 1);
+    if (BOUNCE) { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * (p - 1) ** 3 + c1 * (p - 1) ** 2; }
+    return 1 - (1 - p) ** 3;
+  }
+  let eff = new Float32Array(gw), prev = new Float32Array(gw);
+  function paint() {
+    gbase = Math.floor(off);
+    if (gbase !== labeledAt) { label(); labeledAt = gbase; intro = false; }
+    const lifts = t0s.map(liftOf), top = gbase - B;
+    for (let y = 0; y < GH; y++) {
+      const r = top + y, R = row(r), lrow = (r - winTop) * gw;
+      for (let x = 0; x < gw; x++) {
+        const id = labels[lrow + x], e = id < 0 ? 1 : lifts[id];
+        const v = R[x] - sea - (1 - e) * DROP, k = kindOf(v);
+        eff[x] = v;
+        let c = PAL[k], f = 1, a = c[3];
+        if (k <= 2) {
+          // palette cycling: shallow water foams in slow waves, a few scattered pixels twinkle
+          if (k === 2 && (Math.sin(tt * 0.9 - R[x] * 90) > 0.6 || (BOUNCE && e > 0.3 && e < 0.985))) c = FOAM;
+          else if (k >= 1 && Math.sin(tt * 1.4 + hash(x, r) * 400) > 0.985) c = GLINT;
+          a = c[3] * clamp(e, 0, 1) ** 2;            // a sunken island leaves no trace on the water
+        } else if (x > 0 && y > 0) {
+          const up = prev[x - 1]; f = v - up > 0.004 ? LIT : up - v > 0.004 ? SHADE : 1;
+        }
+        const o = (y * gw + x) * 4; px[o] = Math.min(255, c[0] * f); px[o + 1] = Math.min(255, c[1] * f); px[o + 2] = Math.min(255, c[2] * f); px[o + 3] = a;
+      }
+      [eff, prev] = [prev, eff];
     }
     for (const b of boats) {
-      const set = (x, y, c) => { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= gw || y >= gh) return; const o = (y * gw + x) * 4; px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = c[3]; };
+      const set = (x, y, c) => { x |= 0; y = (y | 0) - top; if (x < 0 || y < 0 || x >= gw || y >= GH) return; const o = (y * gw + x) * 4; px[o] = c[0]; px[o + 1] = c[1]; px[o + 2] = c[2]; px[o + 3] = c[3]; };
       const dx = Math.cos(b.a), dy = Math.sin(b.a);
       set(b.x - dx * 2, b.y - dy * 2, WAKE); set(b.x - dx * 3.5, b.y - dy * 3.5 + 0.5, WAKE);
       set(b.x, b.y, BOAT); set(b.x + (Math.abs(dx) > Math.abs(dy) ? Math.sign(dx) : 0), b.y + (Math.abs(dx) > Math.abs(dy) ? 0 : Math.sign(dy)), BOAT);
     }
     gg.putImageData(img, 0, 0);
   }
+  const isWater = (x, y) => kindOf(row(Math.floor(y))[mod(Math.floor(x), gw)] - sea) <= 1;
+  function placeBoat(b) {
+    let tries = 0;
+    do { b.x = rnd() * gw; b.y = gbase + rnd() * gh; tries++; } while (!isWater(b.x, b.y) && tries < 200);
+    return b;
+  }
+  const boats = Array.from({ length: mobile ? 3 : 6 }, () => placeBoat({ a: rnd() * TAU, v: 0.9 + rnd() * 0.8 }));
   paint();
   return {
     update(dt) {
       tt += dt; acc += dt;
       for (const b of boats) {
         const nx = b.x + Math.cos(b.a) * b.v * dt, ny = b.y + Math.sin(b.a) * b.v * dt;
-        const k = kind[(mod(ny, gh) | 0) * gw + (mod(nx, gw) | 0)];
-        if (k > 2) { b.a += Math.PI * (0.5 + rnd()); } else { b.x = nx; b.y = ny; }
-        if (b.x < -2 || b.x > gw + 2 || b.y < -2 || b.y > gh + 2) { b.x = mod(b.x, gw); b.y = mod(b.y, gh); env.spawned(); }
+        if (!isWater(nx, ny)) { b.a += Math.PI * (0.5 + rnd()); } else { b.x = nx; b.y = ny; }
+        if (b.x < -2 || b.x > gw + 2) { b.x = mod(b.x, gw); env.spawned(); }
+        if (b.y < gbase - B || b.y > gbase + gh + B) { placeBoat(b); env.spawned(); }
       }
       if (acc >= 0.1) { acc = 0; paint(); }
     },
-    draw(ctx) {
+    draw(ctx, par) {
+      off = speed ? (par.sy * speed) / cell : 0;
+      if (Math.abs(off - gbase) > B - 2) paint();
       ctx.imageSmoothingEnabled = false;
-      ctx.globalAlpha = 1; ctx.drawImage(grid, 0, 0, gw * cell, gh * cell);
+      ctx.globalAlpha = 1; ctx.drawImage(grid, 0, Math.round(-(B + off - gbase) * cell * env.S) / env.S, gw * cell, GH * cell);
       ctx.imageSmoothingEnabled = true;
     },
   };
@@ -735,10 +812,10 @@ const STYLE_SCALE = { stars: 1, multiworld: 1, mail: 1 };   // stars need crisp 
 
 /* ------------------------------------------------------------------ engine */
 export function createBackground(canvas, opts = {}) {
-  const o = { style: STYLE, seed: 1, fps: FPS, renderScale: RENDER_SCALE, eggImages: [], pointerTarget: window, scrollTarget: window, eggChance: EGG_CHANCE, ...opts };
+  const o = { style: STYLE, seed: 1, fps: FPS, renderScale: RENDER_SCALE, eggImages: [], pointerTarget: window, scrollTarget: window, eggChance: EGG_CHANCE, rise: 'none', scrollSpeed: 0, ...opts };
   const ctx = canvas.getContext('2d');
-  const env = { W: 1, H: 1, S: o.renderScale, q: o.renderScale, theme: null, rnd: null, mobile: false, spawned: () => { if (Math.random() < o.eggChance) spawnEgg(); }, log: (m) => o.onLog && o.onLog(m) };
-  let scene = null, raf = 0, last = 0, acc = 0, running = false, tt = 0;
+  const env = { animated: true, rebuild: false, rise: o.rise, scrollSpeed: o.scrollSpeed, W: 1, H: 1, S: o.renderScale, q: o.renderScale, theme: null, rnd: null, mobile: false, spawned: () => { if (Math.random() < o.eggChance) spawnEgg(); }, log: (m) => o.onLog && o.onLog(m) };
+  let scene = null, raf = 0, last = 0, acc = 0, running = false, tt = 0, drawnSy = NaN;
   const par = { px: 0, py: 0, tx: 0, ty: 0, sy: 0 };
   const eggs = [], eggImgs = [];
   o.eggImages.forEach((src) => { const im = new Image(); im.decoding = 'async'; im.onload = () => eggImgs.push(im); im.src = src; });
@@ -751,6 +828,7 @@ export function createBackground(canvas, opts = {}) {
     env.theme = themeFromSeed(o.seed);
     env.rnd = mulberry32(((o.seed * 2654435761) ^ (o.style.length * 0x9e3779b9)) >>> 0);
     scene = (CONCEPTS[o.style] || islands)(env);
+    env.rebuild = true;   // later rebuilds (resize, seed) don't replay the intro
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   }
   function spawnEgg() {
@@ -774,6 +852,7 @@ export function createBackground(canvas, opts = {}) {
     }
   }
   function draw() {
+    drawnSy = par.sy;
     ctx.setTransform(env.S, 0, 0, env.S, 0, 0);
     ctx.clearRect(0, 0, env.W, env.H);
     scene.draw(ctx, par);
@@ -787,7 +866,8 @@ export function createBackground(canvas, opts = {}) {
   function frame(now) {
     raf = requestAnimationFrame(frame);
     const dt = last ? (now - last) / 1000 : 0; last = now; acc += dt;
-    if (acc < 1 / o.fps - 0.004) return;
+    readScroll();
+    if (acc < 1 / o.fps - 0.004) { if (par.sy !== drawnSy) draw(); return; }   // scrolling stays smooth between frames
     step(Math.min(acc, 0.1)); acc = 0; draw();
   }
   const onPointer = (e) => {
@@ -796,7 +876,8 @@ export function createBackground(canvas, opts = {}) {
     par.tx = clamp(((e.clientX - r.left) / r.width) * 2 - 1, -1, 1);
     par.ty = clamp(((e.clientY - r.top) / r.height) * 2 - 1, -1, 1);
   };
-  const onScroll = () => { par.sy = o.scrollTarget === window ? window.scrollY : o.scrollTarget.scrollTop; if (!running) draw(); };
+  const readScroll = () => { par.sy = o.scrollTarget === window ? window.scrollY : o.scrollTarget ? o.scrollTarget.scrollTop : 0; };
+  const onScroll = () => { readScroll(); if (!running) draw(); };
   o.pointerTarget && o.pointerTarget.addEventListener('pointermove', onPointer, { passive: true });
   o.scrollTarget && o.scrollTarget.addEventListener('scroll', onScroll, { passive: true });
   let rt = 0;
@@ -809,8 +890,8 @@ export function createBackground(canvas, opts = {}) {
 
   return {
     get theme() { return env.theme; },
-    start() { if (running) return; running = true; last = 0; acc = 0; raf = requestAnimationFrame(frame); },
-    stop() { running = false; cancelAnimationFrame(raf); },
+    start() { env.animated = true; if (running) return; running = true; last = 0; acc = 0; raf = requestAnimationFrame(frame); },
+    stop() { env.animated = false; running = false; cancelAnimationFrame(raf); },
     advance(sec) { const n = Math.ceil(sec * 30); for (let i = 0; i < n; i++) step(1 / 30); draw(); },
     draw,
     spawnEgg,
@@ -870,7 +951,7 @@ async function boot() {
   };
 
   // 3. the background itself
-  const bg = createBackground(canvas, { seed, style: canvas.dataset.style || STYLE, eggImages: await loadEggs(), onLog });
+  const bg = createBackground(canvas, { seed, style: canvas.dataset.style || STYLE, eggImages: await loadEggs(), onLog, rise: RISE, scrollSpeed: SCROLL_SPEED });
   let off = store.get('bgAnimationOff') === 'true';
 
   function apply() {
