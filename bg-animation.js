@@ -29,7 +29,8 @@ const DATA_GAMES = 'data/games.json';
 const DATA_TOOLS = 'data/tools.json';
 const EGG_LIST = 'easter-eggs/list.json';
 const EGG_DIR = 'easter-eggs/';
-const EGG_CHANCE = 0.02;
+const EGG_CHANCE = 0.005;
+const EGG_COOLDOWN = 90000;   // ms: at most one random egg every 90 s
 const FPS = 30;              // slow motion: 30fps is plenty and halves the work
 const RISE = 'stagger-bounce'; // islands emerging as they scroll into view: 'tide' | 'stagger' | 'bounce' | 'stagger-bounce' | 'none'
 const SCROLL_SPEED = 1;       // how fast the map follows the page scroll (0 = fixed, 1 = same speed)
@@ -608,7 +609,7 @@ function pixel(env) {
         const nx = b.x + Math.cos(b.a) * b.v * dt, ny = b.y + Math.sin(b.a) * b.v * dt;
         if (!isWater(nx, ny)) { b.a += Math.PI * (0.5 + rnd()); } else { b.x = nx; b.y = ny; }
         if (b.x < -2 || b.x > gw + 2) { b.x = mod(b.x, gw); env.spawned(); }
-        if (b.y < gbase - B || b.y > gbase + gh + B) { placeBoat(b); env.spawned(); }
+        if (b.y < gbase - B || b.y > gbase + gh + B) placeBoat(b);   // scrolling doesn't roll for eggs
       }
       if (acc >= 0.1) { acc = 0; paint(); }
     },
@@ -814,8 +815,8 @@ const STYLE_SCALE = { stars: 1, multiworld: 1, mail: 1 };   // stars need crisp 
 export function createBackground(canvas, opts = {}) {
   const o = { style: STYLE, seed: 1, fps: FPS, renderScale: RENDER_SCALE, eggImages: [], pointerTarget: window, scrollTarget: window, eggChance: EGG_CHANCE, rise: 'none', scrollSpeed: 0, ...opts };
   const ctx = canvas.getContext('2d');
-  const env = { animated: true, rebuild: false, rise: o.rise, scrollSpeed: o.scrollSpeed, W: 1, H: 1, S: o.renderScale, q: o.renderScale, theme: null, rnd: null, mobile: false, spawned: () => { if (Math.random() < o.eggChance) spawnEgg(); }, log: (m) => o.onLog && o.onLog(m) };
-  let scene = null, raf = 0, last = 0, acc = 0, running = false, tt = 0, drawnSy = NaN;
+  const env = { animated: true, rebuild: false, rise: o.rise, scrollSpeed: o.scrollSpeed, W: 1, H: 1, S: o.renderScale, q: o.renderScale, theme: null, rnd: null, mobile: false, spawned: () => { if (Date.now() - lastEgg > EGG_COOLDOWN && Math.random() < o.eggChance && spawnEgg()) lastEgg = Date.now(); }, log: (m) => o.onLog && o.onLog(m) };
+  let lastEgg = 0, scene = null, raf = 0, last = 0, acc = 0, running = false, tt = 0, drawnSy = NaN;
   const par = { px: 0, py: 0, tx: 0, ty: 0, sy: 0 };
   const eggs = [], eggImgs = [];
   o.eggImages.forEach((src) => { const im = new Image(); im.decoding = 'async'; im.onload = () => eggImgs.push(im); im.src = src; });
@@ -834,7 +835,7 @@ export function createBackground(canvas, opts = {}) {
   function spawnEgg() {
     if (!eggImgs.length) return false;
     const im = eggImgs[Math.floor(Math.random() * eggImgs.length)], { W, H } = env;
-    const w = (env.mobile ? 110 : 170) * (0.8 + Math.random() * 0.4), h = w * (im.naturalHeight / im.naturalWidth || 1), m = Math.max(w, h);
+    const w = (env.mobile ? 60 : 90) * (0.8 + Math.random() * 0.4), h = w * (im.naturalHeight / im.naturalWidth || 1), m = Math.max(w, h);
     const side = Math.floor(Math.random() * 4);
     const x = side === 0 ? -m : side === 1 ? W + m : Math.random() * W, y = side === 2 ? -m : side === 3 ? H + m : Math.random() * H;
     const a = Math.atan2(H / 2 + (Math.random() - 0.5) * H * 0.4 - y, W / 2 + (Math.random() - 0.5) * W * 0.4 - x), v = 34 + Math.random() * 22;
