@@ -63,13 +63,14 @@ async function download(url) {
 }
 
 function findEntry(name, category) {
-    const file = category === 'Tool' ? 'data/tools.json' : 'data/games.json';
-    const data = JSON.parse(fs.readFileSync(path.join(ROOT, file), 'utf8'));
-    const list = data.tools || data.games || data;
+    // games.json/tools.json are build output (not in git); the history files are tracked
+    // and keyed by the exact names the build uses
+    const file = category === 'Tool' ? 'data/tools-history.json' : 'data/game-history.json';
+    const names = Object.keys(JSON.parse(fs.readFileSync(path.join(ROOT, file), 'utf8')));
     const wanted = name.trim().toLowerCase();
-    const entry = list.find(e => e.name.trim().toLowerCase() === wanted);
-    if (!entry) throw new Error(`"${name}" was not found on the ${category === 'Tool' ? 'Tools' : 'Games'} page. Check the spelling.`);
-    return entry;
+    const match = names.find(n => n.trim().toLowerCase() === wanted);
+    if (!match) throw new Error(`"${name}" was not found on the ${category === 'Tool' ? 'Tools' : 'Games'} page. Check the spelling.`);
+    return { name: match };
 }
 
 async function main() {
