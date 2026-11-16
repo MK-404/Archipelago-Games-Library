@@ -1,0 +1,101 @@
+/* Archipelago Games Library — generated from tokens.json */
+:root, [data-theme="dark"] {
+  --bg-primary: hsl(55.8 16.2% 5%);
+  --bg-secondary: hsl(55.8 16.2% 2%);
+  --ink: #f3f1ed;
+  --ink-2: rgba(243, 241, 237, 0.72);
+  --ink-3: rgba(243, 241, 237, 0.56);
+  --on-light: #141418;
+  --glass: rgba(255, 255, 255, 0.045);
+  --glass-line: rgba(255, 255, 255, 0.08);
+  --glass-hover: rgba(255, 255, 255, 0.09);
+  --well: rgba(0, 0, 0, 0.28);
+  --card-tint: rgba(255, 255, 255, 0.05);
+  --surface-tint: rgba(255, 255, 255, 0.06);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --st-stable: #5ad48a;
+  --st-unstable: #f3c04f;
+  --st-broken: #ff6b6b;
+  --st-merged: #5eb1ff;
+  --st-broken-ink: #ff9494;
+  --st-merged-ink: #68b6ff;
+  --tool: #5eb1ff;
+  --tool-ink: var(--st-merged-ink);
+  --meta: #9d8cff;
+  --meta-ink: #b7abff;
+  --hint: #4fd6c4;
+  --adult: #d07cff;
+  --adult-ink: #db9bff;
+  --on-adult: #1a0b26;
+  --discord: #5865f2;
+  --fav: #ff8fb8;
+  --age-yes: #4db475;
+  --on-age-yes: #06200f;
+  --age-no: rgba(255, 107, 107, 0.18);
+  --on-age-no: #ffb4b4;
+  --sheet-green: #0f9d58;
+  --logo-rose: #cd7680;
+  --logo-sand: #f0e08e;
+  --logo-leaf: #78c27a;
+  --logo-orchid: #c993c6;
+  --logo-clay: #d9a07a;
+  --logo-indigo: #7880c1;
+  --focus: #f3f1ed;
+  --shadow-card-hover: 0 20px 34px -16px rgba(0, 0, 0, 0.75);
+  --shadow-modal: 0 30px 80px -20px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-poster: 0 18px 40px -12px rgba(0, 0, 0, 0.8);
+  --shadow-toast: 0 14px 40px -10px rgba(0, 0, 0, 0.7);
+}
+:root {
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-18: 18px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-52: 52px;
+  --radius-card: 4px;
+  --radius-btn: 4px;
+  --radius-ctl: 12px;
+  --radius-modal: 14px;
+  --radius-panel: 18px;
+  --radius-pill: 999px;
+  --h-ctl: 42px;
+  --h-tab: 34px;
+  --h-pill: 36px;
+  --h-badge: 22px;
+  --h-link: 50px;
+  --h-age-btn: 48px;
+  --card-min: 210px;
+  --container: 1400px;
+  --modal-max: 960px;
+  --age-max: 470px;
+  --poster: 200px;
+  --banner: 190px;
+  --z-bg-canvas: -2;
+  --z-bg-overlay: -1;
+  --z-bg-toggle: 40;
+  --z-modal: 100;
+  --z-toast: 200;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-ui: Figtree, system-ui, sans-serif;
+  --font-mono: ui-monospace, Menlo, Consolas, monospace;
+}
+.type-hero { font-family: var(--font-display); font-size: 68px; line-height: 0.95; font-weight: 800; letter-spacing: -0.035em; }
+.type-modal-title { font-family: var(--font-display); font-size: 36px; line-height: 1.02; font-weight: 800; letter-spacing: -0.025em; }
+.type-age-title { font-family: var(--font-display); font-size: 27px; line-height: 1.05; font-weight: 800; letter-spacing: -0.025em; }
+.type-state-title { font-family: var(--font-display); font-size: 26px; line-height: 1.1; font-weight: 800; letter-spacing: -0.02em; }
+.type-card-title { font-family: var(--font-display); font-size: 15.5px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; }
+.type-brand { font-family: var(--font-display); font-size: 16px; line-height: 1; font-weight: 700; }
+.type-body { font-family: var(--font-ui); font-size: 15px; line-height: 1.5; font-weight: 400; }
+.type-control { font-family: var(--font-ui); font-size: 15px; line-height: 1.2; font-weight: 500; }
+.type-link-title { font-family: var(--font-ui); font-size: 15px; line-height: 1.25; font-weight: 650; }
+.type-tab { font-family: var(--font-ui); font-size: 14px; line-height: 1.2; font-weight: 600; }
+.type-chip { font-family: var(--font-ui); font-size: 13.5px; line-height: 1.2; font-weight: 600; }
+.type-meta { font-family: var(--font-ui); font-size: 13px; line-height: 1.4; font-weight: 400; }
+.type-badge { font-family: var(--font-ui); font-size: 12px; line-height: 1; font-weight: 600; }
+.type-section-label { font-family: var(--font-ui); font-size: 12px; line-height: 1; font-weight: 700; letter-spacing: 0.08em; }
+.type-flag { font-family: var(--font-ui); font-size: 11px; line-height: 1; font-weight: 700; letter-spacing: 0.05em; }
+.type-kbd { font-family: var(--font-mono); font-size: 11px; line-height: 1; font-weight: 600; }

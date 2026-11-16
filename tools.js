@@ -1,4 +1,7 @@
 // Archipelago Tools, Meta & Hint Games - Frontend
+import * as UI from './archipelago-ui.js';
+
+const LINK_ICONS = { github: 'icons/github-logo.png', discord: 'icons/discord-logo.png', archipelago: 'icons/archipelago-logo.png' };
 
 // State
 let allTools = [];
@@ -6,174 +9,170 @@ let displayedTools = [];
 let showAdultContent = false;
 
 // DOM Elements
-const searchInput = document.getElementById('searchInput');
-const typeFilter = document.getElementById('typeFilter');
-const sortSelect = document.getElementById('sortSelect');
-const toolsGrid = document.getElementById('toolsGrid');
-const toolCount = document.getElementById('toolCount');
-const loadingMessage = document.getElementById('loadingMessage');
-const errorMessage = document.getElementById('errorMessage');
-
-// Modal Elements
-const toolModal = document.getElementById('toolModal');
-const modalBanner = document.getElementById('modalBanner');
-const modalClose = document.getElementById('modalClose');
-const modalTitle = document.getElementById('modalTitle');
-const modalType = document.getElementById('modalType');
-const modalLinksSection = document.getElementById('modalLinksSection');
-const modalLinks = document.getElementById('modalLinks');
-const modalSupportSection = document.getElementById('modalSupportSection');
-const modalSupport = document.getElementById('modalSupport');
-const modalNotesSection = document.getElementById('modalNotesSection');
-const modalNotes = document.getElementById('modalNotes');
-
-// Age Verification Elements
-const adultContentToggle = document.getElementById('adultContentToggle');
-const ageVerificationModal = document.getElementById('ageVerificationModal');
-const ageConfirmYes = document.getElementById('ageConfirmYes');
-const ageConfirmNo = document.getElementById('ageConfirmNo');
-
-// After Dark Discord button
+const $ = (id) => document.getElementById(id);
+const searchInput = $('searchInput');
+const searchBox = document.querySelector('.search-box');
+const typeFilter = $('typeFilter');
+const sortSelect = $('sortSelect');
+const toolsGrid = $('toolsGrid');
+const filterChips = $('filterChips');
+const adultContentToggle = $('adultContentToggle');
+const ageVerificationModal = $('ageVerificationModal');
+const toolModal = $('toolModal');
 const afterDarkButton = document.querySelector('.discord-button.after-dark');
 
-// Update After Dark button visibility
-function updateAfterDarkButton() {
-    if (afterDarkButton) {
-        if (showAdultContent) {
-            afterDarkButton.classList.remove('hidden');
-        } else {
-            afterDarkButton.classList.add('hidden');
-        }
-    }
+// Fill every [data-ico] placeholder with its inline SVG
+function fillIcons(root = document) {
+    root.querySelectorAll('[data-ico]').forEach(el => {
+        const svg = UI.ICONS[el.dataset.ico];
+        if (!svg) return;
+        if (el.tagName === 'SPAN' && !el.childElementCount) el.outerHTML = svg;
+        else { el.removeAttribute('data-ico'); el.insertAdjacentHTML('afterbegin', svg); }
+    });
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    const savedPreference = localStorage.getItem('showAdultContent');
-    if (savedPreference === 'true') {
+    fillIcons();
+
+    if (localStorage.getItem('showAdultContent') === 'true') {
         showAdultContent = true;
         adultContentToggle.checked = true;
     }
-
     updateAfterDarkButton();
+
+    const sk = '<div class="skeleton-card"><div class="sk-cover"></div><div class="sk-line"></div><div class="sk-line short"></div></div>';
+    toolsGrid.insertAdjacentHTML('beforeend', sk.repeat(10));
 
     try {
         await loadToolsData();
     } catch (error) {
-        showError('Error loading data: ' + error.message);
+        toolsGrid.innerHTML = '';
+        $('errorText').textContent = error.message;
+        $('errorMessage').classList.remove('hidden');
         console.error(error);
+        return;
     }
 
-    searchInput.addEventListener('input', handleSearch);
+    handleSearch();
+    UI.enableCardTilt(toolsGrid);
+
+    searchInput.addEventListener('input', () => {
+        searchBox.classList.toggle('has-value', searchInput.value !== '');
+        handleSearch();
+    });
+    document.querySelector('.search-clear').addEventListener('click', (e) => {
+        e.preventDefault();
+        searchInput.value = '';
+        searchBox.classList.remove('has-value');
+        searchInput.focus();
+        handleSearch();
+    });
     typeFilter.addEventListener('change', handleSearch);
     sortSelect.addEventListener('change', handleSearch);
 
-    adultContentToggle.addEventListener('change', handleAdultToggle);
-
-    ageConfirmYes.addEventListener('click', confirmAge);
-    ageConfirmNo.addEventListener('click', denyAge);
-    ageVerificationModal.addEventListener('click', (e) => {
-        if (e.target === ageVerificationModal) {
-            denyAge();
-        }
+    // Chips drive the hidden #typeFilter select
+    filterChips.addEventListener('click', (e) => {
+        const chip = e.target.closest('.chip');
+        if (!chip) return;
+        setTypeFilter(chip.dataset.filter);
     });
 
-    modalClose.addEventListener('click', closeModal);
+    toolsGrid.addEventListener('click', (e) => {
+        const card = e.target.closest('.game-card');
+        if (!card) return;
+        const tool = displayedTools[+card.dataset.index];
+        if (tool) openToolModal(tool);
+    });
+
+    adultContentToggle.addEventListener('change', handleAdultToggle);
+    $('ageConfirmYes').addEventListener('click', confirmAge);
+    $('ageConfirmNo').addEventListener('click', denyAge);
+    $('ageClose').addEventListener('click', denyAge);
+    ageVerificationModal.addEventListener('click', (e) => {
+        if (e.target === ageVerificationModal) denyAge();
+    });
+
+    $('modalClose').addEventListener('click', closeModal);
     toolModal.addEventListener('click', (e) => {
-        if (e.target === toolModal) {
-            closeModal();
-        }
+        if (e.target === toolModal) closeModal();
     });
 
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-
-        if (ageVerificationModal.classList.contains('active')) {
-            denyAge();
-        } else if (toolModal.classList.contains('active')) {
-            closeModal();
-        }
+        if (ageVerificationModal.classList.contains('active')) denyAge();
+        else if (toolModal.classList.contains('active')) closeModal();
     });
 });
 
 // Load pre-built tools data
 async function loadToolsData() {
-    showLoading('Loading tools...');
+    const response = await fetch('data/tools.json');
+    if (!response.ok) throw new Error("tools.json didn't respond. Try again in a moment.");
 
-    try {
-        const response = await fetch('data/tools.json');
-        if (!response.ok) {
-            throw new Error('Unable to load tools data');
-        }
+    const data = await response.json();
+    allTools = data.tools;
+    $('navToolCount').textContent = allTools.length;
 
-        const data = await response.json();
-        allTools = data.tools;
-
-        console.log(`Loaded ${allTools.length} tools`);
-
-        if (data.generated) {
-            const date = new Date(data.generated);
-            document.getElementById('lastUpdate').textContent =
-                'Last update: ' + date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        }
-
-        hideLoading();
-        handleSearch();
-
-    } catch (error) {
-        hideLoading();
-        throw error;
+    if (data.generated) {
+        const date = new Date(data.generated);
+        $('lastUpdate').textContent =
+            'Last update: ' + date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     }
 }
 
-// Check if tool is adult content
 function isAdultTool(tool) {
     return tool.isAdult === true;
 }
 
-// Handle adult content toggle
+// =====================
+// +18 / AGE VERIFICATION
+// =====================
+function updateAfterDarkButton() {
+    if (afterDarkButton) afterDarkButton.classList.toggle('hidden', !showAdultContent);
+}
+
 function handleAdultToggle() {
     if (adultContentToggle.checked) {
-        if (!showAdultContent) {
-            openAgeVerificationModal();
-        }
+        if (!showAdultContent) openOverlay(ageVerificationModal);
     } else {
-        showAdultContent = false;
-        localStorage.setItem('showAdultContent', 'false');
-        updateAfterDarkButton();
-        handleSearch();
+        setAdult(false);
     }
 }
 
-function openAgeVerificationModal() {
-    ageVerificationModal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-function closeAgeVerificationModal() {
-    ageVerificationModal.classList.remove('active');
-    document.body.style.overflow = '';
+function setAdult(value) {
+    showAdultContent = value;
+    localStorage.setItem('showAdultContent', String(value));
+    adultContentToggle.checked = value;
+    updateAfterDarkButton();
+    handleSearch();
 }
 
 function confirmAge() {
-    showAdultContent = true;
-    localStorage.setItem('showAdultContent', 'true');
-    adultContentToggle.checked = true;
-    updateAfterDarkButton();
-    closeAgeVerificationModal();
-    handleSearch();
+    closeOverlay(ageVerificationModal);
+    setAdult(true);
 }
 
 function denyAge() {
-    showAdultContent = false;
-    localStorage.setItem('showAdultContent', 'false');
-    adultContentToggle.checked = false;
-    updateAfterDarkButton();
-    closeAgeVerificationModal();
-    handleSearch();
+    closeOverlay(ageVerificationModal);
+    setAdult(false);
 }
 
-// Get type priority for sorting
+function openOverlay(overlay) {
+    overlay.classList.add('active');
+    document.body.classList.add('modal-open');
+    const close = overlay.querySelector('.modal-close');
+    if (close) close.focus();
+}
+
+function closeOverlay(overlay) {
+    overlay.classList.remove('active');
+    if (!document.querySelector('.modal-overlay.active')) document.body.classList.remove('modal-open');
+}
+
+// =====================
+// FILTER / SORT / RENDER
+// =====================
 function getTypePriority(toolType) {
     const type = (toolType || '').toLowerCase();
     if (type === 'tool') return 1;
@@ -182,342 +181,137 @@ function getTypePriority(toolType) {
     return 99;
 }
 
-// Sort tools
+const byDate = (t) => t.addedDate ? new Date(t.addedDate) : new Date(0);
+
 function sortTools(tools, sortOption) {
     const sorted = [...tools];
-
     switch (sortOption) {
         case 'default':
             sorted.sort((a, b) => {
                 const aIsNew = a.isNew === true;
                 const bIsNew = b.isNew === true;
-                if (aIsNew && !bIsNew) return -1;
-                if (!aIsNew && bIsNew) return 1;
+                if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
                 return a.name.localeCompare(b.name);
             });
             break;
-
         case 'alpha-asc':
             sorted.sort((a, b) => a.name.localeCompare(b.name));
             break;
-
         case 'alpha-desc':
             sorted.sort((a, b) => b.name.localeCompare(a.name));
             break;
-
         case 'type':
             sorted.sort((a, b) => {
-                const priorityA = getTypePriority(a.toolType);
-                const priorityB = getTypePriority(b.toolType);
-                if (priorityA !== priorityB) return priorityA - priorityB;
-                return a.name.localeCompare(b.name);
+                const diff = getTypePriority(a.toolType) - getTypePriority(b.toolType);
+                return diff || a.name.localeCompare(b.name);
             });
             break;
-
         case 'date-newest':
-            sorted.sort((a, b) => {
-                const dateA = a.addedDate ? new Date(a.addedDate) : new Date(0);
-                const dateB = b.addedDate ? new Date(b.addedDate) : new Date(0);
-                return dateB - dateA;
-            });
+            sorted.sort((a, b) => byDate(b) - byDate(a));
             break;
-
         case 'date-oldest':
-            sorted.sort((a, b) => {
-                const dateA = a.addedDate ? new Date(a.addedDate) : new Date(0);
-                const dateB = b.addedDate ? new Date(b.addedDate) : new Date(0);
-                return dateA - dateB;
-            });
+            sorted.sort((a, b) => byDate(a) - byDate(b));
             break;
     }
-
     return sorted;
 }
 
-// Normalize text for search
-function normalizeText(text) {
-    return text
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase();
+function setTypeFilter(value) {
+    typeFilter.value = value;
+    typeFilter.dispatchEvent(new Event('change'));
 }
 
-// Handle search and filtering
+function normalizeText(text) {
+    return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
 function handleSearch() {
     const query = normalizeText(searchInput.value.trim());
     const typeValue = typeFilter.value;
-    const sortValue = sortSelect.value;
+    const visible = allTools.filter(tool => showAdultContent || !isAdultTool(tool));
 
-    let filtered = allTools.filter(tool => {
-        const normalizedName = normalizeText(tool.name);
-        const matchesSearch = !query || normalizedName.includes(query);
-        const matchesType = typeValue === 'all' || tool.toolType === typeValue;
-
-        if (!showAdultContent && isAdultTool(tool)) {
-            return false;
-        }
-
-        return matchesSearch && matchesType;
+    filterChips.querySelectorAll('.chip').forEach(chip => {
+        const f = chip.dataset.filter;
+        chip.setAttribute('aria-pressed', String(f === typeValue));
+        chip.querySelector('.chip-count').textContent = visible.filter(t => f === 'all' || t.toolType === f).length;
     });
 
-    displayedTools = sortTools(filtered, sortValue);
+    const filtered = visible.filter(tool =>
+        (!query || normalizeText(tool.name).includes(query)) && (typeValue === 'all' || tool.toolType === typeValue));
 
-    updateToolCount();
+    displayedTools = sortTools(filtered, sortSelect.value);
+    const count = displayedTools.length;
+    $('toolCount').innerHTML = `<b>${count}</b> ${count === 1 ? 'item' : 'items'}`;
     renderTools();
 }
 
-// Update tool count
-function updateToolCount() {
-    const count = displayedTools.length;
-    toolCount.textContent = `${count} ${count === 1 ? 'item' : 'items'}`;
-}
-
-// Render tools grid
 function renderTools() {
-    toolsGrid.innerHTML = '';
-
     if (displayedTools.length === 0) {
-        toolsGrid.innerHTML = '<div class="loading-message">No tools found</div>';
+        const q = searchInput.value.trim();
+        const parts = [q ? `Nothing matches “${UI.esc(q)}”.` : 'No tools in this filter.'];
+        if (!showAdultContent) parts.push('18+ entries are hidden.');
+        toolsGrid.innerHTML = `<div class="empty-state"><h3 class="state-title">No tools found</h3><p>${parts.join(' ')}</p><button class="btn primary" type="button" id="clearAll">Clear search &amp; filters</button></div>`;
+        $('clearAll').addEventListener('click', () => {
+            searchInput.value = '';
+            searchBox.classList.remove('has-value');
+            sortSelect.value = 'default';
+            setTypeFilter('all');
+        });
         return;
     }
-
-    displayedTools.forEach(tool => {
-        const card = createToolCard(tool);
-        toolsGrid.appendChild(card);
-    });
+    toolsGrid.innerHTML = displayedTools.map((tool, index) => UI.toolCardHTML(tool, { index })).join('');
 }
 
-// Get icon for tool type
-function getToolTypeIcon(toolType) {
-    const type = (toolType || '').toLowerCase();
-    if (type === 'tool') return '\u{1F527}';
-    if (type === 'meta game') return '\u{1F3B2}';
-    if (type === 'hint game') return '\u{1F4A1}';
-    return '\u{1F4E6}';
-}
+// =====================
+// MODAL
+// =====================
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
 
-// Get border class for tool type
-function getTypeBorderClass(toolType) {
-    const type = (toolType || '').toLowerCase();
-    if (type === 'tool') return 'border-blue';
-    if (type === 'meta game') return 'border-purple';
-    if (type === 'hint game') return 'border-green';
-    return '';
-}
-
-// Create tool card
-function createToolCard(tool) {
-    const card = document.createElement('div');
-    card.className = 'game-card';
-
-    const borderClass = getTypeBorderClass(tool.toolType);
-    if (borderClass) {
-        card.classList.add(borderClass);
-    }
-
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', () => {
-        openToolModal(tool);
-    });
-    card.title = 'Click to view details';
-
-    const icon = getToolTypeIcon(tool.toolType);
-    const coverElement = `<div class="tool-cover-placeholder"><span class="tool-icon">${icon}</span><span>${escapeHtml(tool.name)}</span></div>`;
-
-    let metadata = '';
-    if (tool.toolType) {
-        const typeLower = tool.toolType.toLowerCase();
-        metadata += `<span class="tool-type-badge" data-type="${typeLower}">${escapeHtml(tool.toolType)}</span>`;
-    }
-
-    const newBadge = tool.isNew === true ? '<div class="new-badge">NEW</div>' : '';
-
-    card.innerHTML = `
-        ${newBadge}
-        ${coverElement}
-        <div class="game-info">
-            <div class="game-title" title="${escapeHtml(tool.name)}">${escapeHtml(tool.name)}</div>
-            <div class="game-meta">${metadata || 'Unknown'}</div>
-        </div>
-    `;
-
-    return card;
-}
-
-// UI helpers
-function showLoading(message) {
-    loadingMessage.textContent = message;
-    loadingMessage.style.display = 'block';
-    toolsGrid.style.display = 'none';
-}
-
-function hideLoading() {
-    loadingMessage.style.display = 'none';
-    toolsGrid.style.display = 'grid';
-}
-
-function showError(message) {
-    errorMessage.textContent = message;
-    errorMessage.style.display = 'block';
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Modal Functions
-
-function getIconForUrl(url) {
-    if (url.includes('github.com') || url.includes('gitlab.')) {
-        return '<img src="icons/github-logo.png" class="button-icon" alt="GitHub">';
-    } else if (url.includes('discord.com') || url.includes('discord.gg')) {
-        return '<img src="icons/discord-logo.png" class="button-icon" alt="Discord">';
-    } else if (url.includes('archipelago.gg')) {
-        return '<img src="icons/archipelago-logo.png" class="button-icon" alt="Archipelago">';
-    }
-    return '<span class="button-icon-text">&#128279;</span>';
-}
-
-function parseLinkField(field) {
-    const links = [];
-
-    if (field && field.links && field.links.length > 0) {
-        field.links.forEach(link => {
-            if (link.url) {
-                links.push({
-                    label: link.text || 'Link',
-                    url: link.url
-                });
-            }
-        });
-    }
-
+function renderLinkSection(sectionId, containerId, field, withPrimary) {
+    const links = UI.validLinks(field);
+    $(sectionId).hidden = links.length === 0;
+    $(containerId).innerHTML = links.map((l, i) => UI.linkHTML(l, { primary: withPrimary && i === 0, icons: LINK_ICONS })).join('');
     return links;
 }
 
-// Render a modal link section, hiding it when there is nothing to show
-function renderLinkSection(sectionEl, containerEl, field) {
-    if (!sectionEl || !containerEl) return;
-
-    const links = parseLinkField(field);
-
-    if (links.length === 0) {
-        sectionEl.style.display = 'none';
-        return;
-    }
-
-    containerEl.innerHTML = '';
-    links.forEach(link => {
-        const linkElement = document.createElement('a');
-        linkElement.className = 'modal-link';
-        linkElement.href = link.url;
-        linkElement.target = '_blank';
-        linkElement.rel = 'noopener noreferrer';
-        linkElement.innerHTML = `${getIconForUrl(link.url)} ${escapeHtml(link.label)}`;
-        linkElement.title = link.url;
-        containerEl.appendChild(linkElement);
-    });
-    sectionEl.style.display = 'block';
-}
-
-function formatNotesWithLinks(tool) {
-    if (!tool.notes) return '';
-
-    let notesText = '';
-    let notesLinks = [];
-
-    if (typeof tool.notes === 'object') {
-        notesText = tool.notes.text || '';
-        notesLinks = tool.notes.links || [];
-    } else if (typeof tool.notes === 'string') {
-        notesText = tool.notes;
-    }
-
-    if (!notesText.trim()) return '';
-
-    let formattedText = notesText;
-
-    notesLinks.forEach(link => {
-        let urlIndex = formattedText.indexOf(link.url);
-
-        if (urlIndex === -1 && link.text && link.text !== link.url) {
-            const linkTextIndex = formattedText.indexOf(link.text);
-            if (linkTextIndex !== -1) {
-                const clickableLink = `<a href="${link.url}" target="_blank" rel="noopener noreferrer" class="note-link" title="${link.url}">${link.text}</a>`;
-                formattedText = formattedText.replace(link.text, clickableLink);
-                return;
-            }
-        }
-
-        if (urlIndex !== -1) {
-            const clickableLink = `<a href="${link.url}" target="_blank" rel="noopener noreferrer" class="note-link" title="${link.url}">${link.text || 'Link'}</a>`;
-            const urlPattern = new RegExp(link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-            formattedText = formattedText.replace(urlPattern, clickableLink);
-        }
-    });
-
-    formattedText = formattedText.replace(/\n/g, '<br>');
-
-    return formattedText;
-}
-
-// Open tool modal
 function openToolModal(tool) {
-    console.log('Opening modal for:', tool.name);
+    const [cls, label, icon, hue] = UI.TOOL_TYPES[tool.toolType] || UI.TOOL_TYPES.Tool;
+    const art = UI.toolArt(tool.name, hue);
 
-    modalTitle.textContent = tool.name;
+    const content = toolModal.querySelector('.modal-content');
+    content.classList.remove('border-blue', 'border-purple', 'border-teal');
+    content.classList.add(cls);
 
-    // Set type badge
-    if (tool.toolType) {
-        modalType.textContent = tool.toolType;
-        modalType.className = 'modal-status';
-        modalType.style.display = '';
+    $('modalTitle').textContent = tool.name;
+    $('modalBanner').style.setProperty('--art', `url(${art})`);
+    $('modalPoster').innerHTML = tool.coverPath
+        ? `<img src="${UI.esc(tool.coverPath)}" alt="">`
+        : `<div class="tool-cover-placeholder" style="--art:url(${art})"><span class="tool-icon">${UI.ICONS[icon]}</span></div>`;
 
-        const typeLower = tool.toolType.toLowerCase();
-        if (typeLower === 'tool') {
-            modalType.style.background = 'rgba(26, 159, 255, 0.2)';
-            modalType.style.color = '#1a9fff';
-            modalType.style.border = '1px solid rgba(26, 159, 255, 0.3)';
-        } else if (typeLower === 'meta game') {
-            modalType.style.background = 'rgba(147, 51, 234, 0.2)';
-            modalType.style.color = '#a855f7';
-            modalType.style.border = '1px solid rgba(147, 51, 234, 0.3)';
-        } else if (typeLower === 'hint game') {
-            modalType.style.background = 'rgba(76, 175, 80, 0.2)';
-            modalType.style.color = '#4caf50';
-            modalType.style.border = '1px solid rgba(76, 175, 80, 0.3)';
-        }
-    } else {
-        modalType.style.display = 'none';
-    }
+    const type = $('modalType');
+    type.dataset.type = (tool.toolType || '').toLowerCase();
+    type.innerHTML = UI.ICONS[icon] + UI.esc(label);
+    $('modalNew').classList.toggle('hidden', tool.isNew !== true);
+    $('modalAdult').classList.toggle('hidden', !isAdultTool(tool));
+    $('modalAdded').textContent = tool.addedDate ? 'Added ' + fmtDate(tool.addedDate) : '';
 
-    // Banner - tools don't have banners
-    modalBanner.style.backgroundImage = '';
-    modalBanner.classList.add('no-banner');
+    $('factType').textContent = tool.toolType || '—';
+    $('factDisclosures').textContent = tool.disclosures || '—';
+    $('factAdded').textContent = fmtDate(tool.addedDate);
 
-    // Links and support each get their own section
-    renderLinkSection(modalLinksSection, modalLinks, tool.links);
-    renderLinkSection(modalSupportSection, modalSupport, tool.support);
+    const links = renderLinkSection('modalLinksSection', 'modalLinks', tool.links, true);
+    renderLinkSection('modalSupportSection', 'modalSupport', tool.support, false);
 
-    // Display notes
-    const formattedNotes = formatNotesWithLinks(tool);
+    const notes = UI.notesHTML(tool.notes);
+    $('modalNotesSection').hidden = !notes;
+    $('modalNotes').innerHTML = notes;
 
-    if (formattedNotes) {
-        modalNotes.innerHTML = formattedNotes;
-        modalNotesSection.style.display = 'block';
-    } else {
-        modalNotesSection.style.display = 'none';
-    }
+    $('modalFooter').innerHTML = links[0] ? UI.linkHTML(links[0], { primary: true, icons: LINK_ICONS }) : '';
 
-    // Show modal
-    toolModal.classList.add('active');
-    document.body.style.overflow = 'hidden';
+    toolModal.querySelector('.modal-scroll').scrollTop = 0;
+    openOverlay(toolModal);
 }
 
-// Close modal
 function closeModal() {
-    toolModal.classList.remove('active');
-    document.body.style.overflow = '';
+    closeOverlay(toolModal);
 }

@@ -9,132 +9,153 @@
     <meta http-equiv="Expires" content="0">
     <title>Archipelago Tools & More</title>
     <link rel="icon" type="image/png" href="favicons.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="tokens.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
-    <canvas id="bgCanvas"></canvas>
-    <div id="bgOverlay"></div>
+    <canvas id="bgCanvas" aria-hidden="true"></canvas>
+    <div id="bgOverlay" aria-hidden="true"></div>
     <div class="container">
         <header>
-            <nav class="page-nav">
-                <a href="index.html" class="nav-link">Games</a>
-                <a href="tools.html" class="nav-link highlight active">Tools & More</a>
-            </nav>
             <div class="header-top">
-                <h1>Tools, Meta & Hint Games</h1>
-                <span id="lastUpdate" class="last-update"></span>
+                <a class="brand" href="index.html"><img src="icons/archipelago-logo.png" alt="">Archipelago</a>
+                <nav class="page-nav" aria-label="Sections">
+                    <a href="index.html" class="nav-link">Games</a>
+                    <a href="tools.html" class="nav-link highlight active">Tools &amp; More <span class="nav-count" id="navToolCount"></span></a>
+                </nav>
                 <div class="discord-links">
-                    <a href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer"
-                        class="discord-button" title="Discord Archipelago">
-                        <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
-                        Discord
-                    </a>
-                    <a href="https://discord.gg/rY64GAVs2U" target="_blank" rel="noopener noreferrer"
-                        class="discord-button after-dark" title="Discord After Dark (+18)">
-                        <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
-                        After Dark
-                    </a>
-                    <a href="https://github.com/MK-404/Archipelago-Games-Library" target="_blank"
-                        rel="noopener noreferrer" class="discord-button github-button" title="GitHub Repository">
-                        <img src="icons/github-logo.png" alt="GitHub" class="discord-icon">
-                        GitHub
-                    </a>
-                    <a href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw"
-                        target="_blank" rel="noopener noreferrer" class="discord-button spreadsheet-button"
-                        title="Source Spreadsheet">
-                        Spreadsheet
-                    </a>
+                    <a class="discord-button" href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer"
+                        aria-label="Archipelago Discord" data-tip="Archipelago Discord"><img class="discord-icon" src="icons/discord-logo.png" alt=""></a>
+                    <a class="discord-button after-dark hidden" href="https://discord.gg/rY64GAVs2U" target="_blank" rel="noopener noreferrer"
+                        aria-label="After Dark Discord (18+)" data-tip="After Dark Discord (18+)"><img class="discord-icon" src="icons/discord-logo.png" alt=""></a>
+                    <a class="discord-button github-button" href="https://github.com/MK-404/Archipelago-Games-Library" target="_blank" rel="noopener noreferrer"
+                        aria-label="GitHub" data-tip="GitHub"><img src="icons/github-logo.png" alt=""></a>
+                    <a class="discord-button spreadsheet-button" href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw" target="_blank" rel="noopener noreferrer"
+                        aria-label="Source spreadsheet" data-tip="Source spreadsheet" data-ico="sheet"></a>
                 </div>
             </div>
+            <div class="page-title">
+                <div><span class="ribbon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Tools, Meta<br>&amp; Hint Games</h1></div>
+                <span id="lastUpdate" class="last-update"></span>
+            </div>
             <div class="controls">
-                <input type="text" id="searchInput" placeholder="Search tools..." />
-                <select id="typeFilter">
+                <label class="search-box"><span data-ico="search"></span>
+                    <input id="searchInput" type="text" placeholder="Search tools…" autocomplete="off" aria-label="Search tools">
+                    <button class="search-clear" type="button" aria-label="Clear search" data-ico="close"></button>
+                </label>
+                <select id="typeFilter" class="sr-only" aria-hidden="true" tabindex="-1">
                     <option value="all">All Types</option>
                     <option value="Tool">Tools</option>
                     <option value="Meta Game">Meta Games</option>
                     <option value="Hint Game">Hint Games</option>
                 </select>
-                <select id="sortSelect">
-                    <option value="default">Default</option>
-                    <option value="alpha-asc">A &rarr; Z</option>
-                    <option value="alpha-desc">Z &rarr; A</option>
-                    <option value="type">By Type</option>
-                    <option value="date-newest">Newest First</option>
-                    <option value="date-oldest">Oldest First</option>
-                </select>
-                <div class="adult-toggle">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="adultContentToggle">
-                        <span class="toggle-slider"></span>
-                    </label>
+                <div class="select-box">
+                    <select id="sortSelect" aria-label="Sort">
+                        <option value="default">Default</option>
+                        <option value="alpha-asc">A → Z</option>
+                        <option value="alpha-desc">Z → A</option>
+                        <option value="type">By Type</option>
+                        <option value="date-newest">Newest First</option>
+                        <option value="date-oldest">Oldest First</option>
+                    </select><span data-ico="chevron"></span>
+                </div>
+                <label class="adult-toggle">
+                    <span class="toggle-switch"><input type="checkbox" id="adultContentToggle"><span class="toggle-slider"></span></span>
                     <span class="toggle-label">Show +18</span>
-                </div>
+                </label>
                 <div class="stats">
-                    <span id="toolCount">0 items</span>
+                    <span id="toolCount"><b>0</b> items</span>
                 </div>
+            </div>
+            <div class="filter-chips" role="group" aria-label="Filter by type" id="filterChips">
+                <button class="chip" aria-pressed="true" data-filter="all">All <span class="chip-count"></span></button>
+                <button class="chip type-tool" aria-pressed="false" data-filter="Tool"><span data-ico="tool"></span>Tools <span class="chip-count"></span></button>
+                <button class="chip type-meta" aria-pressed="false" data-filter="Meta Game"><span data-ico="meta"></span>Meta Games <span class="chip-count"></span></button>
+                <button class="chip type-hint" aria-pressed="false" data-filter="Hint Game"><span data-ico="hint"></span>Hint Games <span class="chip-count"></span></button>
             </div>
         </header>
 
-        <div id="loadingMessage" class="loading-message">
-            Loading data...
+        <main id="toolsGrid" class="games-grid">
+            <div id="loadingMessage" class="loading-message"><span class="loading-spinner"></span>Loading tools…</div>
+        </main>
+        <div id="errorMessage" class="error-message hidden">
+            <h3 class="state-title">Couldn't load the library</h3>
+            <p id="errorText"></p>
+            <button class="btn" type="button" onclick="location.reload()">Try again</button>
         </div>
 
-        <div id="errorMessage" class="error-message" style="display: none;"></div>
-
-        <div id="toolsGrid" class="games-grid">
-            <!-- Tool cards will be inserted here -->
-        </div>
+        <footer class="site-footer">
+            <div style="display:flex;align-items:center;gap:12px"><span class="ribbon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                <span>Community-maintained list of <a href="https://archipelago.gg" target="_blank" rel="noopener noreferrer">Archipelago</a> tools · data from the <a href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw" target="_blank" rel="noopener noreferrer">official spreadsheet</a></span></div>
+            <div class="secret-container">
+                <button id="eggSpawnBtn" class="secret-button egg-spawn-btn" type="button" onclick="window.spawnEasterEgg && window.spawnEasterEgg()">🥚 Spawn Easter Egg</button>
+                <button class="secret-button" type="button" onclick="window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ','_blank')">Secret button yay</button>
+            </div>
+        </footer>
     </div>
 
     <!-- Age Verification Modal -->
-    <div id="ageVerificationModal" class="modal-overlay age-verification">
+    <div id="ageVerificationModal" class="modal-overlay age-verification" role="dialog" aria-modal="true" aria-labelledby="ageTitle">
         <div class="modal-content age-modal">
-            <h2 class="age-modal-title">Age Verification Required</h2>
-            <p class="age-modal-text">
-                By enabling this option, you confirm that you are of legal age in your jurisdiction.
-                Content marked as 18+ may contain sensitive themes.
-            </p>
+            <button class="modal-close" id="ageClose" aria-label="Close" data-ico="close"></button>
+            <div class="age-mark">18+</div>
+            <h2 id="ageTitle" class="age-modal-title">Age Verification Required</h2>
+            <p class="age-modal-text">By enabling this option, you confirm that you are of legal age in your jurisdiction.
+                Content marked as 18+ may contain sensitive themes.</p>
+            <div class="age-modal-effects">
+                <div><span data-ico="eye"></span><span>Shows <b>18+ tools</b> in the list</span></div>
+                <div><span data-ico="check"></span><span>You can turn it off again at any time</span></div>
+            </div>
             <div class="age-modal-buttons">
                 <button id="ageConfirmYes" class="age-button age-yes">Yes, I am of legal age</button>
                 <button id="ageConfirmNo" class="age-button age-no">No, I am not</button>
             </div>
+            <p class="age-modal-hint"><span class="kbd">Esc</span> or a click outside = No</p>
         </div>
     </div>
 
     <!-- Tool Detail Modal -->
-    <div id="toolModal" class="modal-overlay">
+    <div id="toolModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content">
-            <div id="modalBanner" class="modal-banner no-banner">
-                <button id="modalClose" class="modal-close">&times;</button>
+            <button id="modalClose" class="modal-close" aria-label="Close" data-ico="close"></button>
+            <div class="modal-scroll">
+                <div id="modalBanner" class="modal-banner no-banner"></div>
+                <div class="modal-head">
+                    <div class="modal-poster" id="modalPoster"></div>
+                    <div class="modal-heading">
+                        <h2 id="modalTitle" class="modal-title"></h2>
+                        <div class="modal-status-row">
+                            <span id="modalType" class="tool-type-badge"></span>
+                            <span id="modalNew" class="new-badge">New</span>
+                            <span id="modalAdult" class="adult-badge">18+</span>
+                            <span id="modalAdded" class="modal-added"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <aside class="modal-side">
+                        <dl class="modal-facts">
+                            <div><dt>Type</dt><dd id="factType"></dd></div>
+                            <div><dt>Disclosures</dt><dd id="factDisclosures"></dd></div>
+                            <div><dt>Added</dt><dd id="factAdded"></dd></div>
+                        </dl>
+                    </aside>
+                    <div class="modal-main">
+                        <section id="modalLinksSection" class="modal-section wide" hidden><h3 class="modal-section-title"><span data-ico="download"></span>Links &amp; Downloads</h3><div id="modalLinks" class="modal-links"></div></section>
+                        <section id="modalSupportSection" class="modal-section" hidden><h3 class="modal-section-title"><span data-ico="chat"></span>Support</h3><div id="modalSupport" class="modal-links"></div></section>
+                        <section id="modalNotesSection" class="modal-section" hidden><h3 class="modal-section-title"><span data-ico="note"></span>Notes</h3><div id="modalNotes" class="modal-notes"></div></section>
+                    </div>
+                </div>
             </div>
-            <div class="modal-body">
-                <h2 id="modalTitle" class="modal-title"></h2>
-                <div id="modalType" class="modal-status"></div>
-
-                <div id="modalLinksSection" class="modal-section" style="display: none;">
-                    <h3 class="modal-section-title">Links & Downloads</h3>
-                    <div id="modalLinks" class="modal-links"></div>
-                </div>
-
-                <div id="modalSupportSection" class="modal-section" style="display: none;">
-                    <h3 class="modal-section-title">Support</h3>
-                    <div id="modalSupport" class="modal-links"></div>
-                </div>
-
-                <div id="modalNotesSection" class="modal-section" style="display: none;">
-                    <h3 class="modal-section-title">Notes</h3>
-                    <div id="modalNotes" class="modal-notes"></div>
-                </div>
-            </div>
+            <div class="modal-footer" id="modalFooter"></div>
         </div>
     </div>
 
     <div id="bgToggle" class="bg-toggle" title="Toggle background animation">HD</div>
-    <script src="tools.js"></script>
-    <script type="importmap">
-    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
-    </script>
+    <script type="module" src="tools.js"></script>
     <script type="module" src="bg-animation.js"></script>
 </body>
 

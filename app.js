@@ -1,4 +1,5 @@
 // Archipelago Games Library - Frontend
+import * as UI from './archipelago-ui.js';
 
 const DISCORD_CLIENT_ID = '1517486577381806231';
 const DISCORD_WORKER_CALLBACK = 'https://archipelago-games-library-auth.lellone-ciao.workers.dev/discord/callback';
@@ -21,6 +22,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 try { firebase.initializeApp(firebaseConfig); } catch (e) { }
 const db = firebase.firestore();
 
+const LINK_ICONS = { github: 'icons/github-logo.png', discord: 'icons/discord-logo.png', archipelago: 'icons/archipelago-logo.png' };
+const CORE_ICON = 'icons/archipelago-logo.png';
+
 // State
 let allGames = [];
 let displayedGames = [];
@@ -29,691 +33,445 @@ let currentUser = null;
 let userFavorites = [];
 let userVotes = [];
 let voteCounts = {};
-
-const ICON_STAR = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256"><path d="M239.18,97.26A16.38,16.38,0,0,0,224.92,86l-59-4.76L143.14,26.15a16.36,16.36,0,0,0-30.27,0L90.11,81.23,31.08,86a16.46,16.46,0,0,0-9.37,28.86l45,38.83L53,211.75a16.38,16.38,0,0,0,24.5,17.82L128,198.49l50.53,31.08A16.4,16.4,0,0,0,203,211.75l-13.76-58.07,45-38.83A16.43,16.43,0,0,0,239.18,97.26Zm-15.34,5.47-48.7,42a8,8,0,0,0-2.56,7.91l14.88,62.8a.37.37,0,0,1-.17.48c-.18.14-.23.11-.38,0l-54.72-33.65a8,8,0,0,0-8.38,0L69.09,215.94c-.15.09-.19.12-.38,0a.37.37,0,0,1-.17-.48l14.88-62.8a8,8,0,0,0-2.56-7.91l-48.7-42c-.12-.1-.23-.19-.13-.5s.18-.27.33-.29l63.92-5.16A8,8,0,0,0,103,91.86l24.62-59.61c.08-.17.11-.25.35-.25s.27.08.35.25L153,91.86a8,8,0,0,0,6.75,4.92l63.92,5.16c.15,0,.24,0,.33.29S224,102.63,223.84,102.73Z"/></svg>`;
-const ICON_STAR_FILL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256"><path d="M234.29,114.85l-45,38.83L203,211.75a16.4,16.4,0,0,1-24.5,17.82L128,198.49,77.47,229.57A16.4,16.4,0,0,1,53,211.75l13.76-58.07-45-38.83A16.46,16.46,0,0,1,31.08,86l59-4.76,22.76-55.08a16.36,16.36,0,0,1,30.27,0l22.75,55.08,59,4.76a16.46,16.46,0,0,1,9.37,28.86Z"/></svg>`;
-const ICON_THUMBS = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256"><path d="M234,80.12A24,24,0,0,0,216,72H160V56a40,40,0,0,0-40-40,8,8,0,0,0-7.16,4.42L75.06,96H32a16,16,0,0,0-16,16v88a16,16,0,0,0,16,16H204a24,24,0,0,0,23.82-21l12-96A24,24,0,0,0,234,80.12ZM32,112H72v88H32ZM223.94,97l-12,96a8,8,0,0,1-7.94,7H88V105.89l36.71-73.43A24,24,0,0,1,144,56V80a8,8,0,0,0,8,8h64a8,8,0,0,1,7.94,9Z"/></svg>`;
-const ICON_THUMBS_FILL = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 256 256"><path d="M234,80.12A24,24,0,0,0,216,72H160V56a40,40,0,0,0-40-40,8,8,0,0,0-7.16,4.42L75.06,96H32a16,16,0,0,0-16,16v88a16,16,0,0,0,16,16H204a24,24,0,0,0,23.82-21l12-96A24,24,0,0,0,234,80.12ZM32,112H72v88H32Z"/></svg>`;
+let activeFilter = 'all';
+let modalGame = null;
 
 // DOM Elements
-const searchInput = document.getElementById('searchInput');
-const sortSelect = document.getElementById('sortSelect');
-const gamesGrid = document.getElementById('gamesGrid');
-const gameCount = document.getElementById('gameCount');
-const loadingMessage = document.getElementById('loadingMessage');
-const errorMessage = document.getElementById('errorMessage');
-
-// Modal Elements
-const gameModal = document.getElementById('gameModal');
-const modalBanner = document.getElementById('modalBanner');
-const modalClose = document.getElementById('modalClose');
-const modalTitle = document.getElementById('modalTitle');
-const modalStatus = document.getElementById('modalStatus');
-const modalPrStatus = document.getElementById('modalPrStatus');
-const modalLinksSection = document.getElementById('modalLinksSection');
-const modalLinks = document.getElementById('modalLinks');
-const modalSetupSection = document.getElementById('modalSetupSection');
-const modalSetup = document.getElementById('modalSetup');
-const modalSupportSection = document.getElementById('modalSupportSection');
-const modalSupport = document.getElementById('modalSupport');
-const modalNotesSection = document.getElementById('modalNotesSection');
-const modalNotes = document.getElementById('modalNotes');
-
-// Age Verification Elements
-const adultContentToggle = document.getElementById('adultContentToggle');
-const ageVerificationModal = document.getElementById('ageVerificationModal');
-const ageConfirmYes = document.getElementById('ageConfirmYes');
-const ageConfirmNo = document.getElementById('ageConfirmNo');
-
-// After Dark Discord button
+const $ = (id) => document.getElementById(id);
+const searchInput = $('searchInput');
+const searchBox = document.querySelector('.search-box');
+const sortSelect = $('sortSelect');
+const gamesGrid = $('gamesGrid');
+const gameCount = $('gameCount');
+const filterChips = $('filterChips');
+const adultContentToggle = $('adultContentToggle');
+const ageVerificationModal = $('ageVerificationModal');
+const gameModal = $('gameModal');
 const afterDarkButton = document.querySelector('.discord-button.after-dark');
+const toast = $('toast');
 
-// Update After Dark button visibility
-function updateAfterDarkButton() {
-    if (afterDarkButton) {
-        if (showAdultContent) {
-            afterDarkButton.classList.remove('hidden');
-        } else {
-            afterDarkButton.classList.add('hidden');
-        }
-    }
+// Fill every [data-ico] placeholder with its inline SVG
+function fillIcons(root = document) {
+    root.querySelectorAll('[data-ico]').forEach(el => {
+        const svg = UI.ICONS[el.dataset.ico];
+        if (!svg) return;
+        if (el.tagName === 'SPAN' && !el.childElementCount) el.outerHTML = svg;
+        else { el.removeAttribute('data-ico'); el.insertAdjacentHTML('afterbegin', svg); }
+    });
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-    // Load adult content preference from localStorage
-    const savedPreference = localStorage.getItem('showAdultContent');
-    if (savedPreference === 'true') {
+    fillIcons();
+
+    if (localStorage.getItem('showAdultContent') === 'true') {
         showAdultContent = true;
         adultContentToggle.checked = true;
     }
-
-    // Update After Dark button visibility on load
     updateAfterDarkButton();
 
-    // Init Discord auth (parse URL hash callback, load user from localStorage)
     initAuth();
-    // Init auth UI (login button or user info)
     initAuthUI();
-    // Start Supabase presence tracking
     initPresence();
+    renderSkeletons();
 
     try {
         const tasks = [loadGamesData(), loadVoteCounts()];
         if (currentUser) tasks.push(loadUserData(currentUser.id));
         await Promise.all(tasks);
     } catch (error) {
-        showError('Error loading data: ' + error.message);
+        showError(error.message);
         console.error(error);
+        return;
     }
 
     handleSearch();
+    UI.enableCardTilt(gamesGrid);
 
-    searchInput.addEventListener('input', handleSearch);
+    searchInput.addEventListener('input', () => {
+        searchBox.classList.toggle('has-value', searchInput.value !== '');
+        handleSearch();
+    });
+    document.querySelector('.search-clear').addEventListener('click', (e) => {
+        e.preventDefault();
+        searchInput.value = '';
+        searchBox.classList.remove('has-value');
+        searchInput.focus();
+        handleSearch();
+    });
     sortSelect.addEventListener('change', handleSearch);
 
-    // Adult content toggle event listener
+    filterChips.addEventListener('click', (e) => {
+        const chip = e.target.closest('.chip');
+        if (!chip) return;
+        setFilter(chip.dataset.filter);
+    });
+
+    gamesGrid.addEventListener('click', handleGridClick);
+
     adultContentToggle.addEventListener('change', handleAdultToggle);
-
-    // Age verification modal event listeners
-    ageConfirmYes.addEventListener('click', confirmAge);
-    ageConfirmNo.addEventListener('click', denyAge);
+    $('ageConfirmYes').addEventListener('click', confirmAge);
+    $('ageConfirmNo').addEventListener('click', denyAge);
+    $('ageClose').addEventListener('click', denyAge);
     ageVerificationModal.addEventListener('click', (e) => {
-        if (e.target === ageVerificationModal) {
-            denyAge();
-        }
+        if (e.target === ageVerificationModal) denyAge();
     });
 
-    // Modal event listeners
-    modalClose.addEventListener('click', closeModal);
+    $('modalClose').addEventListener('click', closeModal);
     gameModal.addEventListener('click', (e) => {
-        if (e.target === gameModal) {
-            closeModal();
-        }
+        if (e.target === gameModal) closeModal();
     });
+    gameModal.addEventListener('click', handleModalActionClick);
 
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-
-        if (ageVerificationModal.classList.contains('active')) {
-            denyAge();
-        } else if (gameModal.classList.contains('active')) {
-            closeModal();
-        }
+        if (ageVerificationModal.classList.contains('active')) denyAge();
+        else if (gameModal.classList.contains('active')) closeModal();
     });
 });
 
 // Load pre-built games data
 async function loadGamesData() {
-    showLoading('Loading games...');
+    const response = await fetch('data/games.json');
+    if (!response.ok) throw new Error("games.json didn't respond. Try again in a moment.");
 
-    try {
-        const response = await fetch('data/games.json');
-        if (!response.ok) {
-            throw new Error('Unable to load game data');
-        }
+    const data = await response.json();
+    allGames = data.games;
+    $('navGameCount').textContent = allGames.length;
+    $('adultCount').textContent = `${allGames.filter(isAfterDark).length} games`;
 
-        const data = await response.json();
-        allGames = data.games;
-
-        console.log(`Loaded ${allGames.length} games`);
-        console.log(`Generated: ${data.generated}`);
-
-        // Show last update date
-        if (data.generated) {
-            const date = new Date(data.generated);
-            document.getElementById('lastUpdate').textContent =
-                'Last update: ' + date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        }
-
-        hideLoading();
-
-    } catch (error) {
-        hideLoading();
-        throw error;
+    if (data.generated) {
+        const date = new Date(data.generated);
+        $('lastUpdate').textContent =
+            'Last update: ' + date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     }
 }
 
-// Check if game is new (added in last build)
 function isGameNew(game) {
     return game.isNew === true;
 }
 
-// Check if game is After Dark (+18)
 function isAfterDark(game) {
     return game.isAdult === true;
 }
 
-// Handle adult content toggle
+// =====================
+// +18 / AGE VERIFICATION
+// =====================
+function updateAfterDarkButton() {
+    if (afterDarkButton) afterDarkButton.classList.toggle('hidden', !showAdultContent);
+}
+
 function handleAdultToggle() {
     if (adultContentToggle.checked) {
-        if (!showAdultContent) {
-            openAgeVerificationModal();
-        }
+        if (!showAdultContent) openOverlay(ageVerificationModal);
     } else {
-        showAdultContent = false;
-        localStorage.setItem('showAdultContent', 'false');
-        updateAfterDarkButton();
-        handleSearch();
+        setAdult(false);
     }
 }
 
-// Open age verification modal
-function openAgeVerificationModal() {
-    ageVerificationModal.classList.add('active');
-    document.body.style.overflow = 'hidden';
+function setAdult(value) {
+    showAdultContent = value;
+    localStorage.setItem('showAdultContent', String(value));
+    adultContentToggle.checked = value;
+    updateAfterDarkButton();
+    handleSearch();
 }
 
-// Close age verification modal
-function closeAgeVerificationModal() {
-    ageVerificationModal.classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-// Confirm age (Yes button)
 function confirmAge() {
-    showAdultContent = true;
-    localStorage.setItem('showAdultContent', 'true');
-    adultContentToggle.checked = true;
-    updateAfterDarkButton();
-    closeAgeVerificationModal();
-    handleSearch();
+    closeOverlay(ageVerificationModal);
+    setAdult(true);
 }
 
-// Deny age (No button)
 function denyAge() {
-    showAdultContent = false;
-    localStorage.setItem('showAdultContent', 'false');
-    adultContentToggle.checked = false;
-    updateAfterDarkButton();
-    closeAgeVerificationModal();
-    handleSearch();
+    closeOverlay(ageVerificationModal);
+    setAdult(false);
 }
 
-// Get status priority for sorting
+function openOverlay(overlay) {
+    overlay.classList.add('active');
+    document.body.classList.add('modal-open');
+    const close = overlay.querySelector('.modal-close');
+    if (close) close.focus();
+}
+
+function closeOverlay(overlay) {
+    overlay.classList.remove('active');
+    if (!document.querySelector('.modal-overlay.active')) document.body.classList.remove('modal-open');
+}
+
+// =====================
+// FILTER / SORT / RENDER
+// =====================
 function getStatusPriority(status) {
     const statusLower = status ? status.toLowerCase() : '';
-
     if (statusLower.includes('broken')) return 6;
     if (statusLower.includes('unstable')) return 5;
     if (statusLower.includes('stable')) return 4;
     if (statusLower.includes('merged')) return 1;
-
     return 99;
 }
 
-// Sort games based on selected option
+const byDate = (g) => g.addedDate ? new Date(g.addedDate) : new Date(0);
+
 function sortGames(games, sortOption) {
     const sorted = [...games];
-
     switch (sortOption) {
         case 'default':
             sorted.sort((a, b) => {
-                // Favorites first (only when logged in)
+                // Favorites first (only when logged in), then new games
                 const aFav = currentUser && userFavorites.includes(a.name);
                 const bFav = currentUser && userFavorites.includes(b.name);
-                if (aFav && !bFav) return -1;
-                if (!aFav && bFav) return 1;
-                // Then new games first
-                const aIsNew = isGameNew(a);
-                const bIsNew = isGameNew(b);
-                if (aIsNew && !bIsNew) return -1;
-                if (!aIsNew && bIsNew) return 1;
+                if (aFav !== bFav) return aFav ? -1 : 1;
+                if (isGameNew(a) !== isGameNew(b)) return isGameNew(a) ? -1 : 1;
                 return a.name.localeCompare(b.name);
             });
             break;
-
         case 'alpha-asc':
             sorted.sort((a, b) => a.name.localeCompare(b.name));
             break;
-
         case 'alpha-desc':
             sorted.sort((a, b) => b.name.localeCompare(a.name));
             break;
-
         case 'status':
             sorted.sort((a, b) => {
-                const priorityA = getStatusPriority(a.stability || a.status);
-                const priorityB = getStatusPriority(b.stability || b.status);
-                if (priorityA !== priorityB) return priorityA - priorityB;
-                return a.name.localeCompare(b.name);
+                const diff = getStatusPriority(a.stability || a.status) - getStatusPriority(b.stability || b.status);
+                return diff || a.name.localeCompare(b.name);
             });
             break;
-
         case 'date-newest':
-            sorted.sort((a, b) => {
-                const dateA = a.addedDate ? new Date(a.addedDate) : new Date(0);
-                const dateB = b.addedDate ? new Date(b.addedDate) : new Date(0);
-                return dateB - dateA;
-            });
+            sorted.sort((a, b) => byDate(b) - byDate(a));
             break;
-
         case 'date-oldest':
-            sorted.sort((a, b) => {
-                const dateA = a.addedDate ? new Date(a.addedDate) : new Date(0);
-                const dateB = b.addedDate ? new Date(b.addedDate) : new Date(0);
-                return dateA - dateB;
-            });
+            sorted.sort((a, b) => byDate(a) - byDate(b));
             break;
-
         case 'votes':
             sorted.sort((a, b) => {
-                const votesA = voteCounts[gameKey(a.name)] || 0;
-                const votesB = voteCounts[gameKey(b.name)] || 0;
-                if (votesB !== votesA) return votesB - votesA;
-                return a.name.localeCompare(b.name);
+                const diff = (voteCounts[gameKey(b.name)] || 0) - (voteCounts[gameKey(a.name)] || 0);
+                return diff || a.name.localeCompare(b.name);
             });
             break;
     }
-
     return sorted;
 }
 
-// Render games grid
-function renderGames() {
-    gamesGrid.innerHTML = '';
-
-    if (displayedGames.length === 0) {
-        gamesGrid.innerHTML = '<div class="loading-message">No games found</div>';
-        return;
-    }
-
-    displayedGames.forEach(game => {
-        const card = createGameCard(game);
-        gamesGrid.appendChild(card);
-    });
+function matchesFilter(game, filter) {
+    if (filter === 'all') return true;
+    if (filter === 'core') return game.prStatus === 'Core';
+    if (filter === 'favorites') return userFavorites.includes(game.name);
+    return (game.stability || game.status) === filter;
 }
 
-// Get status border class based on stability
-function getStatusBorderClass(status) {
-    if (!status) return '';
-
-    const statusLower = status.toLowerCase();
-
-    if (statusLower.includes('unstable')) return 'border-yellow';
-    if (statusLower.includes('broken')) return 'border-red';
-    if (statusLower.includes('merged') ||
-        statusLower.includes('stable')) {
-        return 'border-green';
-    }
-
-    return '';
+function setFilter(filter) {
+    activeFilter = filter;
+    filterChips.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.filter === filter)));
+    handleSearch();
 }
 
-// Create game card
-function createGameCard(game) {
-    const card = document.createElement('div');
-    card.className = 'game-card';
-
-    const borderClass = getStatusBorderClass(game.stability || game.status);
-    if (borderClass) {
-        card.classList.add(borderClass);
-    }
-
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', () => {
-        openGameModal(game);
+function updateChipCounts(visible) {
+    filterChips.querySelectorAll('.chip').forEach(chip => {
+        chip.querySelector('.chip-count').textContent = visible.filter(g => matchesFilter(g, chip.dataset.filter)).length;
     });
-    card.title = 'Click to view details';
-
-    const coverImg = game.coverPath
-        ? `<img src="${game.coverPath}" alt="${escapeHtml(game.name)}" class="game-cover" onerror="this.className='game-cover error'; this.outerHTML='<div class=\\'game-cover error\\'>${escapeHtml(game.name)}</div>';">`
-        : `<div class="game-cover error">${escapeHtml(game.name)}</div>`;
-
-    // Build metadata - stability badge
-    let metadata = '';
-    const stability = game.stability || game.status;
-    if (stability && stability !== 'Unknown') {
-        const statusLower = stability.toLowerCase();
-        metadata += `<span class="game-status" data-status="${statusLower}">${escapeHtml(stability)}</span>`;
-    }
-
-    // PR Status badge (only show Merged)
-    const prStatus = game.prStatus || '';
-    if (prStatus.toLowerCase() === 'merged') {
-        metadata += `<span class="game-pr-status" data-pr-status="merged">${escapeHtml(prStatus)}</span>`;
-    }
-
-    const newBadge = isGameNew(game) ? '<div class="new-badge">NEW</div>' : '';
-    const voteCount = voteCounts[gameKey(game.name)] || 0;
-
-    card.innerHTML = `
-        <div class="game-cover-wrapper">
-            ${newBadge}
-            ${coverImg}
-        </div>
-        <div class="game-info">
-            <div class="game-title" title="${escapeHtml(game.name)}">${escapeHtml(game.name)}</div>
-            <div class="game-meta">
-                <div class="game-meta-badges">${metadata || 'Unknown'}</div>
-                <div class="game-actions">
-                    <div class="thumbs-area">
-                        <button class="thumbs-btn">
-                            <span class="icon-outline">${ICON_THUMBS}</span>
-                            <span class="icon-fill">${ICON_THUMBS_FILL}</span>
-                        </button>
-                        <span class="vote-count">${voteCount > 0 ? voteCount : ''}</span>
-                    </div>
-                    <button class="star-btn">
-                        <span class="icon-outline">${ICON_STAR}</span>
-                        <span class="icon-fill">${ICON_STAR_FILL}</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    const starBtn = card.querySelector('.star-btn');
-    const thumbsBtn = card.querySelector('.thumbs-btn');
-    const voteCountSpan = card.querySelector('.vote-count');
-
-    // Set data attributes via JS to avoid HTML escaping issues
-    starBtn.dataset.game = game.name;
-    thumbsBtn.dataset.game = game.name;
-
-    updateStarBtn(starBtn, game.name);
-    updateThumbsBtn(thumbsBtn, game.name);
-
-    starBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!currentUser) { triggerDiscordLogin(); return; }
-        toggleFavorite(game.name);
-    });
-
-    thumbsBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!currentUser) { triggerDiscordLogin(); return; }
-        toggleVote(game.name, thumbsBtn, voteCountSpan);
-    });
-
-    return card;
+    const favChip = filterChips.querySelector('[data-filter="favorites"]');
+    favChip.classList.toggle('hidden', !currentUser);
+    if (!currentUser && activeFilter === 'favorites') setFilter('all');
 }
 
-// Normalize text for search (remove accents)
 function normalizeText(text) {
-    return text
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase();
+    return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-// Handle search and filtering
 function handleSearch() {
     const query = normalizeText(searchInput.value.trim());
-    const sortValue = sortSelect.value;
+    const visible = allGames.filter(game => showAdultContent || !isAfterDark(game));
+    updateChipCounts(visible);
 
-    let filtered = allGames.filter(game => {
-        const normalizedName = normalizeText(game.name);
-        const matchesSearch = !query || normalizedName.includes(query);
+    const filtered = visible.filter(game =>
+        (!query || normalizeText(game.name).includes(query)) && matchesFilter(game, activeFilter));
 
-        if (!showAdultContent && isAfterDark(game)) {
-            return false;
-        }
-
-        return matchesSearch;
-    });
-
-    displayedGames = sortGames(filtered, sortValue);
-
-    updateGameCount();
+    displayedGames = sortGames(filtered, sortSelect.value);
+    const count = displayedGames.length;
+    gameCount.innerHTML = `<b>${count}</b> ${count === 1 ? 'game' : 'games'}`;
     renderGames();
 }
 
-// Update game count
-function updateGameCount() {
-    const count = displayedGames.length;
-    gameCount.textContent = `${count} ${count === 1 ? 'game' : 'games'}`;
+function renderGames() {
+    if (displayedGames.length === 0) {
+        renderEmptyState();
+        return;
+    }
+    gamesGrid.innerHTML = displayedGames.map((game, index) => UI.gameCardHTML(game, {
+        favorited: currentUser && userFavorites.includes(game.name),
+        voted: currentUser && userVotes.includes(game.name),
+        votes: voteCounts[gameKey(game.name)] || 0,
+        coreIcon: CORE_ICON,
+        index
+    })).join('');
+    gamesGrid.querySelectorAll('img.game-cover').forEach(img => {
+        img.addEventListener('error', () => img.classList.add('error'), { once: true });
+    });
 }
 
-// UI helpers
-function showLoading(message) {
-    loadingMessage.textContent = message;
-    loadingMessage.style.display = 'block';
-    gamesGrid.style.display = 'none';
+function renderSkeletons() {
+    const sk = '<div class="skeleton-card"><div class="sk-cover"></div><div class="sk-line"></div><div class="sk-line short"></div></div>';
+    gamesGrid.insertAdjacentHTML('beforeend', sk.repeat(10));
 }
 
-function hideLoading() {
-    loadingMessage.style.display = 'none';
-    gamesGrid.style.display = 'grid';
+function renderEmptyState() {
+    const q = searchInput.value.trim();
+    const parts = [];
+    if (q) parts.push(`Nothing matches “${UI.esc(q)}”.`);
+    else parts.push('No games in this filter.');
+    if (!showAdultContent) parts.push('18+ entries are hidden.');
+    gamesGrid.innerHTML = `<div class="empty-state"><h3 class="state-title">No games found</h3><p>${parts.join(' ')}</p><button class="btn primary" type="button" id="clearAll">Clear search &amp; filters</button></div>`;
+    $('clearAll').addEventListener('click', () => {
+        searchInput.value = '';
+        searchBox.classList.remove('has-value');
+        sortSelect.value = 'default';
+        setFilter('all');
+    });
 }
 
 function showError(message) {
-    errorMessage.textContent = message;
-    errorMessage.style.display = 'block';
+    gamesGrid.innerHTML = '';
+    $('errorText').textContent = message;
+    $('errorMessage').classList.remove('hidden');
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+function showToast(html, ms = 3200) {
+    toast.innerHTML = html;
+    toast.classList.add('show');
+    clearTimeout(showToast.t);
+    showToast.t = setTimeout(() => toast.classList.remove('show'), ms);
+    const btn = toast.querySelector('.discord-login-btn');
+    if (btn) btn.addEventListener('click', triggerDiscordLogin);
 }
 
-// Modal Functions
+function askLogin() {
+    showToast('Log in with Discord to vote and save favourites <button class="discord-login-btn" type="button"><img class="discord-icon" src="icons/discord-logo.png" alt="">Login</button>');
+}
 
-// Get icon based on URL
-function getIconForUrl(url) {
-    if (url.includes('github.com') || url.includes('gitlab.')) {
-        return '<img src="icons/github-logo.png" class="button-icon" alt="GitHub">';
-    } else if (url.includes('discord.com') || url.includes('discord.gg')) {
-        return '<img src="icons/discord-logo.png" class="button-icon" alt="Discord">';
-    } else if (url.includes('archipelago.gg')) {
-        return '<img src="icons/archipelago-logo.png" class="button-icon" alt="Archipelago">';
+function handleGridClick(e) {
+    const card = e.target.closest('.game-card');
+    if (!card) return;
+    const game = displayedGames[+card.dataset.index];
+    if (!game) return;
+
+    if (e.target.closest('.star-btn')) {
+        e.stopPropagation();
+        if (!currentUser) { askLogin(); return; }
+        toggleFavorite(game.name);
+        return;
     }
-    return '<span class="button-icon-text">&#128279;</span>';
+    if (e.target.closest('.thumbs-btn')) {
+        e.stopPropagation();
+        if (!currentUser) { askLogin(); return; }
+        toggleVote(game.name);
+        return;
+    }
+    openGameModal(game);
 }
 
-// Parse a {text, links} field into a flat list of usable links
-function parseLinkField(field) {
-    const links = [];
+// =====================
+// MODAL
+// =====================
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
 
-    if (field && field.links && field.links.length > 0) {
-        field.links.forEach(link => {
-            if (link.url) {
-                links.push({
-                    label: link.text || 'Link',
-                    url: link.url
-                });
-            }
-        });
-    }
-
+function renderLinkSection(sectionId, containerId, field, withPrimary) {
+    const links = UI.validLinks(field);
+    $(sectionId).hidden = links.length === 0;
+    $(containerId).innerHTML = links.map((l, i) => UI.linkHTML(l, { primary: withPrimary && i === 0, icons: LINK_ICONS })).join('');
     return links;
 }
 
-// Render a modal link section, hiding it when there is nothing to show
-function renderLinkSection(sectionEl, containerEl, field) {
-    if (!sectionEl || !containerEl) return;
+function openGameModal(game) {
+    modalGame = game;
+    const stability = game.stability || game.status || '';
+    const [cls, label, icon] = UI.statusOf(stability);
 
-    const links = parseLinkField(field);
+    $('modalTitle').textContent = game.name;
+    $('modalPoster').src = game.coverPath || '';
 
-    if (links.length === 0) {
-        sectionEl.style.display = 'none';
-        return;
+    const row = $('modalStatusRow');
+    row.classList.remove('border-green', 'border-yellow', 'border-red');
+    row.classList.add(cls);
+    $('modalStatus').innerHTML = UI.ICONS[icon] + UI.esc(label);
+
+    const pr = $('modalPrStatus');
+    pr.className = 'modal-pr-status';
+    if (game.prStatus === 'Core') {
+        pr.classList.add('pr-core');
+        pr.innerHTML = `<img src="${CORE_ICON}" alt="">Core`;
+        pr.classList.toggle('hidden', false);
+    } else if (game.prStatus === 'Merged') {
+        pr.classList.add('pr-merged');
+        pr.innerHTML = UI.ICONS.merged + 'Merged';
+        pr.classList.toggle('hidden', false);
+    } else {
+        pr.classList.toggle('hidden', true);
     }
+    $('modalNew').classList.toggle('hidden', !isGameNew(game));
+    $('modalAdult').classList.toggle('hidden', !isAfterDark(game));
+    $('modalAdded').textContent = game.addedDate ? 'Added ' + fmtDate(game.addedDate) : '';
 
-    containerEl.innerHTML = '';
-    links.forEach(link => {
-        const linkElement = document.createElement('a');
-        linkElement.className = 'modal-link';
-        linkElement.href = link.url;
-        linkElement.target = '_blank';
-        linkElement.rel = 'noopener noreferrer';
-        linkElement.innerHTML = `${getIconForUrl(link.url)} ${escapeHtml(link.label)}`;
-        linkElement.title = link.url;
-        containerEl.appendChild(linkElement);
+    const banner = $('modalBanner');
+    banner.classList.remove('is-default', 'no-banner');
+    banner.style.backgroundImage = game.bannerPath ? `url("${game.bannerPath}")` : '';
+    if (!game.bannerPath) banner.classList.add('no-banner');
+    else if (game.bannerPath.endsWith('_default.png')) banner.classList.add('is-default');
+
+    $('factStatus').textContent = stability || '—';
+    $('factPr').textContent = game.prStatus && game.prStatus !== '--' ? game.prStatus : '—';
+    $('factAdded').textContent = fmtDate(game.addedDate);
+
+    const downloads = renderLinkSection('modalLinksSection', 'modalLinks', game.links, true);
+    renderLinkSection('modalSetupSection', 'modalSetup', game.setupGuides, false);
+    renderLinkSection('modalSupportSection', 'modalSupport', game.support, false);
+
+    const notes = UI.notesHTML(game.notes);
+    $('modalNotesSection').hidden = !notes;
+    $('modalNotes').innerHTML = notes;
+
+    // Mobile sticky footer: primary download + the two actions
+    $('modalFooter').innerHTML = (downloads[0] ? UI.linkHTML(downloads[0], { primary: true, icons: LINK_ICONS }) : '') + $('modalActions').innerHTML;
+    syncModalActions();
+
+    gameModal.querySelector('.modal-scroll').scrollTop = 0;
+    openOverlay(gameModal);
+}
+
+function syncModalActions() {
+    if (!modalGame) return;
+    const fav = !!currentUser && userFavorites.includes(modalGame.name);
+    const voted = !!currentUser && userVotes.includes(modalGame.name);
+    const votes = voteCounts[gameKey(modalGame.name)] || 0;
+    gameModal.querySelectorAll('.modal-action.star-btn').forEach(b => {
+        b.classList.toggle('favorited', fav);
+        b.setAttribute('aria-pressed', String(fav));
     });
-    sectionEl.style.display = 'block';
-}
-
-// Convert notes text with links to HTML
-function formatNotesWithLinks(game) {
-    if (!game.notes) return '';
-
-    let notesText = '';
-    let notesLinks = [];
-
-    if (typeof game.notes === 'object') {
-        notesText = game.notes.text || '';
-        notesLinks = game.notes.links || [];
-    } else if (typeof game.notes === 'string') {
-        notesText = game.notes;
-    }
-
-    if (!notesText.trim()) return '';
-
-    let formattedText = notesText;
-
-    notesLinks.forEach(link => {
-        let urlIndex = formattedText.indexOf(link.url);
-
-        if (urlIndex === -1 && link.text && link.text !== link.url) {
-            const linkTextIndex = formattedText.indexOf(link.text);
-            if (linkTextIndex !== -1) {
-                const clickableLink = `<a href="${link.url}" target="_blank" rel="noopener noreferrer" class="note-link" title="${link.url}">${link.text}</a>`;
-                formattedText = formattedText.replace(link.text, clickableLink);
-                return;
-            }
-        }
-
-        if (urlIndex !== -1) {
-            const beforeUrl = formattedText.substring(Math.max(0, urlIndex - 100), urlIndex);
-
-            const patterns = [
-                /([^.!?\n]+):\s*$/,
-                /\n([^\n]+)\s*$/,
-                /([^.!?\n]+)\s+$/,
-                /^(.+)$/
-            ];
-            let linkLabel = 'Link';
-            let labelToRemove = '';
-            let replaceWithNewline = false;
-
-            for (const pattern of patterns) {
-                const match = beforeUrl.match(pattern);
-                if (match && match[1].trim().length > 0 && match[1].trim().length < 50) {
-                    linkLabel = match[1].trim();
-                    if (pattern === patterns[0]) {
-                        labelToRemove = match[0];
-                    } else if (pattern === patterns[1]) {
-                        labelToRemove = match[1];
-                        replaceWithNewline = true;
-                    }
-                    break;
-                }
-            }
-
-            const clickableLink = `<a href="${link.url}" target="_blank" rel="noopener noreferrer" class="note-link" title="${link.url}">${linkLabel}</a>`;
-
-            if (labelToRemove) {
-                if (replaceWithNewline) {
-                    const textToReplace = labelToRemove + link.url;
-                    const escapedText = textToReplace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const replacePattern = new RegExp(escapedText, 'g');
-                    formattedText = formattedText.replace(replacePattern, '\n' + clickableLink);
-                } else {
-                    const labelAndUrl = labelToRemove + link.url;
-                    formattedText = formattedText.replace(labelAndUrl, clickableLink);
-                }
-            } else {
-                const urlPattern = new RegExp(link.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-                formattedText = formattedText.replace(urlPattern, clickableLink);
-            }
-        }
+    gameModal.querySelectorAll('.modal-action.thumbs-btn').forEach(b => {
+        b.classList.toggle('voted', voted);
+        b.setAttribute('aria-pressed', String(voted));
+        b.querySelector('.vote-count').textContent = votes;
     });
-
-    formattedText = formattedText.replace(/\n/g, '<br>');
-
-    return formattedText;
 }
 
-
-// Open game modal
-async function openGameModal(game) {
-    console.log('Opening modal for:', game.name);
-
-    // Set title
-    modalTitle.textContent = game.name;
-
-    // Set stability status
-    const stability = game.stability || game.status;
-    if (stability) {
-        modalStatus.textContent = stability;
-        modalStatus.className = 'modal-status';
-        modalStatus.style.display = '';
-
-        const statusLower = stability.toLowerCase();
-        if (statusLower.includes('unstable')) {
-            modalStatus.style.background = 'rgba(255, 193, 7, 0.2)';
-            modalStatus.style.color = '#ffc107';
-            modalStatus.style.border = '1px solid rgba(255, 193, 7, 0.3)';
-        } else if (statusLower.includes('broken')) {
-            modalStatus.style.background = 'rgba(244, 67, 54, 0.2)';
-            modalStatus.style.color = '#f44336';
-            modalStatus.style.border = '1px solid rgba(244, 67, 54, 0.3)';
-        } else {
-            modalStatus.style.background = 'rgba(76, 175, 80, 0.2)';
-            modalStatus.style.color = '#4caf50';
-            modalStatus.style.border = '1px solid rgba(76, 175, 80, 0.3)';
-        }
-    } else {
-        modalStatus.style.display = 'none';
-    }
-
-    // Set PR Status badge
-    const prStatus = game.prStatus || '';
-    if (modalPrStatus) {
-        if (prStatus.toLowerCase() === 'merged') {
-            modalPrStatus.textContent = prStatus;
-            modalPrStatus.className = 'modal-pr-status';
-            modalPrStatus.style.display = '';
-            modalPrStatus.style.background = 'rgba(26, 159, 255, 0.2)';
-            modalPrStatus.style.color = '#1a9fff';
-            modalPrStatus.style.border = '1px solid rgba(26, 159, 255, 0.3)';
-        } else {
-            modalPrStatus.style.display = 'none';
-        }
-    }
-
-    // Set banner from local file
-    modalBanner.style.backgroundImage = '';
-    modalBanner.classList.remove('no-banner');
-
-    if (game.bannerPath) {
-        modalBanner.style.backgroundImage = `url(${game.bannerPath})`;
-    } else {
-        modalBanner.classList.add('no-banner');
-    }
-
-    // Downloads, setup guides and support each get their own section
-    renderLinkSection(modalLinksSection, modalLinks, game.links);
-    renderLinkSection(modalSetupSection, modalSetup, game.setupGuides);
-    renderLinkSection(modalSupportSection, modalSupport, game.support);
-
-    // Display notes with inline clickable links
-    const formattedNotes = formatNotesWithLinks(game);
-
-    if (formattedNotes) {
-        modalNotes.innerHTML = formattedNotes;
-        modalNotesSection.style.display = 'block';
-    } else {
-        modalNotesSection.style.display = 'none';
-    }
-
-    // Show modal
-    gameModal.classList.add('active');
-    document.body.style.overflow = 'hidden';
+function handleModalActionClick(e) {
+    const btn = e.target.closest('.modal-action');
+    if (!btn || !modalGame) return;
+    if (!currentUser) { askLogin(); return; }
+    if (btn.classList.contains('star-btn')) toggleFavorite(modalGame.name);
+    else toggleVote(modalGame.name);
 }
 
-// Close modal
 function closeModal() {
-    gameModal.classList.remove('active');
-    document.body.style.overflow = '';
+    closeOverlay(gameModal);
+    modalGame = null;
 }
 
 // =====================
 // AUTH FUNCTIONS
 // =====================
-
 function initAuth() {
     const hash = window.location.hash;
     if (hash && hash.includes('discord_id=')) {
@@ -726,7 +484,6 @@ function initAuth() {
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }
     }
-
     if (hash && hash.includes('auth_error=')) {
         const params = new URLSearchParams(hash.substring(1));
         console.warn('Discord auth error:', params.get('auth_error'), params.get('detail'));
@@ -740,40 +497,34 @@ function initAuth() {
 }
 
 function initAuthUI() {
-    const loginBtn = document.getElementById('discord-login-btn');
-    const userInfo = document.getElementById('user-info');
-    const userAvatar = document.getElementById('user-avatar');
-    const userName = document.getElementById('user-name');
-    const logoutBtn = document.getElementById('logout-btn');
+    const loginBtn = $('discord-login-btn');
+    const userInfo = $('user-info');
 
+    document.body.classList.toggle('logged-out', !currentUser);
     if (currentUser) {
         loginBtn.style.display = 'none';
         userInfo.style.display = 'flex';
-        userName.textContent = currentUser.username;
-        userAvatar.src = currentUser.avatar
+        $('user-name').textContent = currentUser.username;
+        $('user-avatar').src = currentUser.avatar
             ? `https://cdn.discordapp.com/avatars/${currentUser.id}/${currentUser.avatar}.png?size=64`
             : `https://cdn.discordapp.com/embed/avatars/${parseInt(currentUser.id) % 6}.png`;
     } else {
         loginBtn.style.display = 'flex';
         userInfo.style.display = 'none';
     }
-
-    loginBtn.addEventListener('click', triggerDiscordLogin);
-    logoutBtn.addEventListener('click', () => {
-        localStorage.removeItem('discord_user');
-        currentUser = null;
-        userFavorites = [];
-        userVotes = [];
-        initAuthUI();
-        handleSearch();
-    });
 }
 
+$('discord-login-btn').addEventListener('click', triggerDiscordLogin);
+$('logout-btn').addEventListener('click', () => {
+    localStorage.removeItem('discord_user');
+    currentUser = null;
+    userFavorites = [];
+    userVotes = [];
+    initAuthUI();
+    handleSearch();
+});
+
 function triggerDiscordLogin() {
-    if (!DISCORD_CLIENT_ID || DISCORD_CLIENT_ID === 'YOUR_DISCORD_CLIENT_ID') {
-        alert('Discord login not configured.\nSet DISCORD_CLIENT_ID and DISCORD_WORKER_CALLBACK in app.js.');
-        return;
-    }
     const redirectUri = encodeURIComponent(DISCORD_WORKER_CALLBACK);
     window.location.href = `https://discord.com/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&response_type=code&scope=identify&redirect_uri=${redirectUri}`;
 }
@@ -781,16 +532,10 @@ function triggerDiscordLogin() {
 // =====================
 // SUPABASE PRESENCE
 // =====================
-
 function initPresence() {
-    if (!SUPABASE_URL || SUPABASE_URL.includes('YOUR_SUPABASE_URL')) {
-        document.querySelector('.online-counter').style.display = 'none';
-        return;
-    }
-
+    const counter = document.querySelector('.online-counter');
     try {
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
         const userId = currentUser
             ? 'discord_' + currentUser.id
             : (() => {
@@ -805,27 +550,21 @@ function initPresence() {
         const channel = supabase.channel('online-users', {
             config: { presence: { key: userId } }
         });
-
         channel.on('presence', { event: 'sync' }, () => {
-            const count = Object.keys(channel.presenceState()).length;
-            document.getElementById('onlineCount').textContent = count;
+            $('onlineCount').textContent = Object.keys(channel.presenceState()).length;
         });
-
         channel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                await channel.track({ online_at: Date.now() });
-            }
+            if (status === 'SUBSCRIBED') await channel.track({ online_at: Date.now() });
         });
     } catch (e) {
         console.warn('Supabase presence not available:', e.message);
-        document.querySelector('.online-counter').style.display = 'none';
+        counter.style.display = 'none';
     }
 }
 
 // =====================
 // FIRESTORE HELPERS
 // =====================
-
 function gameKey(name) {
     return name.replace(/[./\[\]*~]/g, '_');
 }
@@ -842,39 +581,42 @@ async function loadVoteCounts() {
 async function loadUserData(discordId) {
     try {
         const snap = await db.collection('users').doc(discordId).get();
-        if (snap.exists) {
-            const data = snap.data();
-            userFavorites = data.favorites || [];
-            userVotes = data.votes || [];
-        } else {
-            userFavorites = [];
-            userVotes = [];
-        }
+        const data = snap.exists ? snap.data() : {};
+        userFavorites = data.favorites || [];
+        userVotes = data.votes || [];
     } catch (e) {
         console.warn('Failed to load user data:', e.message);
     }
 }
 
+// Update the card buttons for one game without re-rendering the grid
+function updateCard(gameName) {
+    const card = [...gamesGrid.querySelectorAll('.game-card')].find(c => c.dataset.name === gameName);
+    if (card) {
+        const fav = userFavorites.includes(gameName);
+        const voted = userVotes.includes(gameName);
+        const star = card.querySelector('.star-btn');
+        const thumbs = card.querySelector('.thumbs-btn');
+        star.classList.toggle('favorited', fav);
+        star.setAttribute('aria-pressed', String(fav));
+        thumbs.classList.toggle('voted', voted);
+        thumbs.setAttribute('aria-pressed', String(voted));
+        thumbs.querySelector('.vote-count').textContent = voteCounts[gameKey(gameName)] || 0;
+    }
+    syncModalActions();
+}
+
 async function toggleFavorite(gameName) {
     if (!currentUser) return;
     const isFav = userFavorites.includes(gameName);
+    userFavorites = isFav ? userFavorites.filter(n => n !== gameName) : [...userFavorites, gameName];
 
-    if (isFav) {
-        userFavorites = userFavorites.filter(n => n !== gameName);
-    } else {
-        userFavorites.push(gameName);
-    }
-
-    // Update all star buttons for this game in DOM
-    document.querySelectorAll('.star-btn').forEach(btn => {
-        if (btn.dataset.game === gameName) updateStarBtn(btn, gameName);
-    });
-
-    if (sortSelect.value === 'default') handleSearch();
+    if (sortSelect.value === 'default' || activeFilter === 'favorites') handleSearch();
+    else { updateCard(gameName); updateChipCounts(allGames.filter(g => showAdultContent || !isAfterDark(g))); }
+    syncModalActions();
 
     try {
-        const userRef = db.collection('users').doc(currentUser.id);
-        await userRef.set({
+        await db.collection('users').doc(currentUser.id).set({
             favorites: isFav
                 ? firebase.firestore.FieldValue.arrayRemove(gameName)
                 : firebase.firestore.FieldValue.arrayUnion(gameName)
@@ -884,23 +626,18 @@ async function toggleFavorite(gameName) {
     }
 }
 
-async function toggleVote(gameName, thumbsBtn, countSpan) {
+async function toggleVote(gameName) {
     if (!currentUser) return;
     const hasVoted = userVotes.includes(gameName);
     const key = gameKey(gameName);
     const delta = hasVoted ? -1 : 1;
 
-    if (hasVoted) {
-        userVotes = userVotes.filter(n => n !== gameName);
-    } else {
-        userVotes.push(gameName);
-    }
-
+    userVotes = hasVoted ? userVotes.filter(n => n !== gameName) : [...userVotes, gameName];
     voteCounts[key] = Math.max(0, (voteCounts[key] || 0) + delta);
-    updateThumbsBtn(thumbsBtn, gameName);
-    if (countSpan) countSpan.textContent = voteCounts[key] > 0 ? voteCounts[key] : '';
 
     if (sortSelect.value === 'votes') handleSearch();
+    else updateCard(gameName);
+    syncModalActions();
 
     try {
         const userRef = db.collection('users').doc(currentUser.id);
@@ -928,18 +665,4 @@ async function updateVoteCountDoc(voteRef, key, delta) {
             throw e;
         }
     }
-}
-
-function updateStarBtn(btn, gameName) {
-    if (!btn) return;
-    const isFav = currentUser && userFavorites.includes(gameName);
-    btn.classList.toggle('favorited', isFav);
-    btn.title = isFav ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
-}
-
-function updateThumbsBtn(btn, gameName) {
-    if (!btn) return;
-    const hasVoted = currentUser && userVotes.includes(gameName);
-    btn.classList.toggle('voted', hasVoted);
-    btn.title = hasVoted ? 'Rimuovi voto' : 'Vota';
 }

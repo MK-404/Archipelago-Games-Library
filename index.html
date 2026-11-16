@@ -9,164 +9,173 @@
     <meta http-equiv="Expires" content="0">
     <title>Archipelago Games Library</title>
     <link rel="icon" type="image/png" href="favicons.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="tokens.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 
-<body>
-    <canvas id="bgCanvas"></canvas>
-    <div id="bgOverlay"></div>
+<body class="logged-out">
+    <canvas id="bgCanvas" aria-hidden="true"></canvas>
+    <div id="bgOverlay" aria-hidden="true"></div>
     <div class="container">
         <header>
-            <nav class="page-nav">
-                <a href="index.html" class="nav-link active">Games</a>
-                <a href="tools.html" class="nav-link highlight">Tools & More</a>
-                <div id="auth-section" class="auth-section">
-                    <button id="discord-login-btn" class="discord-login-btn">
-                        <img src="icons/discord-logo.png" alt="Discord" class="discord-icon"
-                            style="width:16px;height:16px;">
-                        Login
-                    </button>
-                    <div id="user-info" class="user-info" style="display:none">
-                        <img id="user-avatar" class="user-avatar" src="" alt="Avatar">
-                        <span id="user-name" class="user-name"></span>
-                        <button id="logout-btn" class="logout-btn">×</button>
-                    </div>
-                </div>
-            </nav>
             <div class="header-top">
-                <h1>Archipelago Games Library</h1>
-                <span id="lastUpdate" class="last-update"></span>
+                <a class="brand" href="index.html"><img src="icons/archipelago-logo.png" alt="">Archipelago</a>
+                <nav class="page-nav" aria-label="Sections">
+                    <a href="index.html" class="nav-link active">Games <span class="nav-count" id="navGameCount"></span></a>
+                    <a href="tools.html" class="nav-link highlight">Tools &amp; More <span class="nav-new">New</span></a>
+                </nav>
                 <div class="discord-links">
-                    <a href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer"
-                        class="discord-button" title="Discord Archipelago">
-                        <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
-                        Discord
-                    </a>
-                    <a href="https://discord.gg/rY64GAVs2U" target="_blank" rel="noopener noreferrer"
-                        class="discord-button after-dark" title="Discord After Dark (+18)">
-                        <img src="icons/discord-logo.png" alt="Discord" class="discord-icon">
-                        After Dark
-                    </a>
-                    <a href="https://github.com/MK-404/Archipelago-Games-Library" target="_blank"
-                        rel="noopener noreferrer" class="discord-button github-button" title="GitHub Repository">
-                        <img src="icons/github-logo.png" alt="GitHub" class="discord-icon">
-                        GitHub
-                    </a>
-                    <a href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw"
-                        target="_blank" rel="noopener noreferrer" class="discord-button spreadsheet-button"
-                        title="Source Spreadsheet">
-                        Spreadsheet
-                    </a>
+                    <a class="discord-button" href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer"
+                        aria-label="Archipelago Discord" data-tip="Archipelago Discord"><img class="discord-icon" src="icons/discord-logo.png" alt=""></a>
+                    <a class="discord-button after-dark hidden" href="https://discord.gg/rY64GAVs2U" target="_blank" rel="noopener noreferrer"
+                        aria-label="After Dark Discord (18+)" data-tip="After Dark Discord (18+)"><img class="discord-icon" src="icons/discord-logo.png" alt=""></a>
+                    <a class="discord-button github-button" href="https://github.com/MK-404/Archipelago-Games-Library" target="_blank" rel="noopener noreferrer"
+                        aria-label="GitHub" data-tip="GitHub"><img src="icons/github-logo.png" alt=""></a>
+                    <a class="discord-button spreadsheet-button" href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw" target="_blank" rel="noopener noreferrer"
+                        aria-label="Source spreadsheet" data-tip="Source spreadsheet" data-ico="sheet"></a>
+                </div>
+                <div id="auth-section" class="auth-section">
+                    <button id="discord-login-btn" class="discord-login-btn"><img class="discord-icon" src="icons/discord-logo.png" alt="">Login</button>
+                    <div id="user-info" class="user-info" style="display:none">
+                        <img id="user-avatar" class="user-avatar" src="" alt="">
+                        <span id="user-name" class="user-name"></span>
+                        <button id="logout-btn" class="logout-btn" aria-label="Log out">×</button>
+                    </div>
                 </div>
             </div>
+            <div class="page-title">
+                <div><span class="ribbon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Archipelago<br>Games Library</h1></div>
+                <span id="lastUpdate" class="last-update"></span>
+            </div>
             <div class="controls">
-                <input type="text" id="searchInput" placeholder="Search games..." />
-                <select id="sortSelect">
-                    <option value="default">Default</option>
-                    <option value="votes">By Votes</option>
-                    <option value="alpha-asc">A → Z</option>
-                    <option value="alpha-desc">Z → A</option>
-                    <option value="status">By Status</option>
-                    <option value="date-newest">Newest First</option>
-                    <option value="date-oldest">Oldest First</option>
-                </select>
-                <div class="adult-toggle">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="adultContentToggle">
-                        <span class="toggle-slider"></span>
-                    </label>
+                <label class="search-box"><span data-ico="search"></span>
+                    <input id="searchInput" type="text" placeholder="Search games…" autocomplete="off" aria-label="Search games">
+                    <button class="search-clear" type="button" aria-label="Clear search" data-ico="close"></button>
+                </label>
+                <div class="select-box">
+                    <select id="sortSelect" aria-label="Sort">
+                        <option value="default">Default</option>
+                        <option value="votes">By Votes</option>
+                        <option value="alpha-asc">A → Z</option>
+                        <option value="alpha-desc">Z → A</option>
+                        <option value="status">By Status</option>
+                        <option value="date-newest">Newest First</option>
+                        <option value="date-oldest">Oldest First</option>
+                    </select><span data-ico="chevron"></span>
+                </div>
+                <label class="adult-toggle">
+                    <span class="toggle-switch"><input type="checkbox" id="adultContentToggle"><span class="toggle-slider"></span></span>
                     <span class="toggle-label">Show +18</span>
-                </div>
+                </label>
                 <div class="stats">
-                    <div class="online-counter">
-                        <span class="online-dot"></span>
-                        <span id="onlineCount">0</span>
-                        <span class="online-label">online</span>
-                    </div>
-                    <span id="gameCount">0 games</span>
+                    <span class="online-counter"><span class="online-dot"></span><b id="onlineCount">0</b> <span class="online-label">online</span></span>
+                    <span id="gameCount"><b>0</b> games</span>
                 </div>
+            </div>
+            <div class="filter-chips" role="group" aria-label="Filter by status" id="filterChips">
+                <button class="chip" aria-pressed="true" data-filter="all">All <span class="chip-count"></span></button>
+                <button class="chip st-stable" aria-pressed="false" data-filter="Stable"><span class="chip-pip"></span>Stable <span class="chip-count"></span></button>
+                <button class="chip st-unstable" aria-pressed="false" data-filter="Unstable"><span class="chip-pip"></span>Unstable <span class="chip-count"></span></button>
+                <button class="chip st-broken" aria-pressed="false" data-filter="Broken on Main"><span class="chip-pip"></span>Broken <span class="chip-count"></span></button>
+                <button class="chip" aria-pressed="false" data-filter="core">Core <span class="chip-count"></span></button>
+                <button class="chip hidden" aria-pressed="false" data-filter="favorites">★ Favorites <span class="chip-count"></span></button>
             </div>
         </header>
 
-        <div id="loadingMessage" class="loading-message">
-            Loading data...
+        <main id="gamesGrid" class="games-grid">
+            <div id="loadingMessage" class="loading-message"><span class="loading-spinner"></span>Loading games…</div>
+        </main>
+        <div id="errorMessage" class="error-message hidden">
+            <h3 class="state-title">Couldn't load the library</h3>
+            <p id="errorText"></p>
+            <button class="btn" type="button" onclick="location.reload()">Try again</button>
         </div>
 
-        <div id="errorMessage" class="error-message" style="display: none;"></div>
-
-        <div id="gamesGrid" class="games-grid">
-            <!-- Game cards will be inserted here -->
-        </div>
-        <div class="secret-container">
-            <span class="secret-button"
-                onclick="window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ','_blank')">Secret button yay</span>
-            <span id="eggSpawnBtn" class="secret-button egg-spawn-btn" style="display:none;"
-                onclick="window.spawnEasterEgg && window.spawnEasterEgg()">🥚 Spawn Easter Egg</span>
-        </div>
+        <footer class="site-footer">
+            <div style="display:flex;align-items:center;gap:12px"><span class="ribbon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                <span>Community-maintained list of <a href="https://archipelago.gg" target="_blank" rel="noopener noreferrer">Archipelago</a> games · data from the <a href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw" target="_blank" rel="noopener noreferrer">official spreadsheet</a></span></div>
+            <div class="secret-container">
+                <button id="eggSpawnBtn" class="secret-button egg-spawn-btn" type="button" onclick="window.spawnEasterEgg && window.spawnEasterEgg()">🥚 Spawn Easter Egg</button>
+                <button class="secret-button" type="button" onclick="window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ','_blank')">Secret button yay</button>
+            </div>
+        </footer>
     </div>
 
     <!-- Age Verification Modal -->
-    <div id="ageVerificationModal" class="modal-overlay age-verification">
+    <div id="ageVerificationModal" class="modal-overlay age-verification" role="dialog" aria-modal="true" aria-labelledby="ageTitle">
         <div class="modal-content age-modal">
-            <h2 class="age-modal-title">Age Verification Required</h2>
-            <p class="age-modal-text">
-                By enabling this option, you confirm that you are of legal age in your jurisdiction.
-                Games published in After Dark may contain sensitive content including violence, blood,
-                or sexual themes.
-            </p>
+            <button class="modal-close" id="ageClose" aria-label="Close" data-ico="close"></button>
+            <div class="age-mark">18+</div>
+            <h2 id="ageTitle" class="age-modal-title">Age Verification Required</h2>
+            <p class="age-modal-text">By enabling this option, you confirm that you are of legal age in your jurisdiction.
+                Games published in After Dark may contain sensitive content including violence, blood, or sexual themes.</p>
+            <div class="age-modal-effects">
+                <div><span data-ico="eye"></span><span>Shows <b id="adultCount">0 games</b> marked 18+</span></div>
+                <div><span data-ico="chat"></span><span>Adds the <b>After Dark</b> Discord link to the header</span></div>
+                <div><span data-ico="check"></span><span>You can turn it off again at any time</span></div>
+            </div>
             <div class="age-modal-buttons">
                 <button id="ageConfirmYes" class="age-button age-yes">Yes, I am of legal age</button>
                 <button id="ageConfirmNo" class="age-button age-no">No, I am not</button>
             </div>
+            <p class="age-modal-hint"><span class="kbd">Esc</span> or a click outside = No</p>
         </div>
     </div>
 
     <!-- Game Detail Modal -->
-    <div id="gameModal" class="modal-overlay">
+    <div id="gameModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content">
-            <div id="modalBanner" class="modal-banner">
-                <button id="modalClose" class="modal-close">&times;</button>
+            <button id="modalClose" class="modal-close" aria-label="Close" data-ico="close"></button>
+            <div class="modal-scroll">
+                <div id="modalBanner" class="modal-banner"></div>
+                <div class="modal-head">
+                    <div class="modal-poster"><img id="modalPoster" src="" alt=""></div>
+                    <div class="modal-heading">
+                        <h2 id="modalTitle" class="modal-title"></h2>
+                        <div class="modal-status-row" id="modalStatusRow">
+                            <span id="modalStatus" class="modal-status"></span>
+                            <span id="modalPrStatus" class="modal-pr-status"></span>
+                            <span id="modalNew" class="new-badge">New</span>
+                            <span id="modalAdult" class="adult-badge">18+</span>
+                            <span id="modalAdded" class="modal-added"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <aside class="modal-side">
+                        <div class="modal-actions" id="modalActions">
+                            <button class="modal-action star-btn" type="button" aria-label="Favorite"><span data-ico="starOutline"></span><span data-ico="starFill"></span><span class="action-label">Favorite</span></button>
+                            <button class="modal-action thumbs-btn" type="button" aria-label="Vote"><span data-ico="thumbsOutline"></span><span data-ico="thumbsFill"></span><span class="vote-count">0</span></button>
+                        </div>
+                        <dl class="modal-facts">
+                            <div><dt>Status</dt><dd id="factStatus"></dd></div>
+                            <div><dt>PR status</dt><dd id="factPr"></dd></div>
+                            <div><dt>Added</dt><dd id="factAdded"></dd></div>
+                        </dl>
+                    </aside>
+                    <div class="modal-main">
+                        <section id="modalLinksSection" class="modal-section" hidden><h3 class="modal-section-title"><span data-ico="download"></span>Downloads</h3><div id="modalLinks" class="modal-links"></div></section>
+                        <section id="modalSetupSection" class="modal-section" hidden><h3 class="modal-section-title"><span data-ico="book"></span>Setup Guide</h3><div id="modalSetup" class="modal-links"></div></section>
+                        <section id="modalSupportSection" class="modal-section" hidden><h3 class="modal-section-title"><span data-ico="chat"></span>Support</h3><div id="modalSupport" class="modal-links"></div></section>
+                        <section id="modalNotesSection" class="modal-section" hidden><h3 class="modal-section-title"><span data-ico="note"></span>Notes</h3><div id="modalNotes" class="modal-notes"></div></section>
+                    </div>
+                </div>
             </div>
-            <div class="modal-body">
-                <h2 id="modalTitle" class="modal-title"></h2>
-                <div class="modal-status-row">
-                    <div id="modalStatus" class="modal-status"></div>
-                    <div id="modalPrStatus" class="modal-pr-status"></div>
-                </div>
-
-                <div id="modalLinksSection" class="modal-section" style="display: none;">
-                    <h3 class="modal-section-title">Downloads</h3>
-                    <div id="modalLinks" class="modal-links"></div>
-                </div>
-
-                <div id="modalSetupSection" class="modal-section" style="display: none;">
-                    <h3 class="modal-section-title">Setup Guide</h3>
-                    <div id="modalSetup" class="modal-links"></div>
-                </div>
-
-                <div id="modalSupportSection" class="modal-section" style="display: none;">
-                    <h3 class="modal-section-title">Support</h3>
-                    <div id="modalSupport" class="modal-links"></div>
-                </div>
-
-                <div id="modalNotesSection" class="modal-section" style="display: none;">
-                    <h3 class="modal-section-title">Notes</h3>
-                    <div id="modalNotes" class="modal-notes"></div>
-                </div>
-            </div>
+            <div class="modal-footer" id="modalFooter"></div>
         </div>
     </div>
+
+    <div id="toast" class="toast" role="status"></div>
+    <div id="bgToggle" class="bg-toggle" title="Toggle background animation">HD</div>
 
     <!-- Firebase Compat SDK (Firestore for favorites/votes) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <!-- Supabase (online counter) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script type="importmap">
-    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
-    </script>
-    <div id="bgToggle" class="bg-toggle" title="Toggle background animation">HD</div>
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
     <script type="module" src="bg-animation.js"></script>
 </body>
 
