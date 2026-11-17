@@ -984,17 +984,20 @@ const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').repl
 function writeSeoFiles(games, tools) {
     const root = path.join(__dirname, '..');
     const today = new Date().toISOString().slice(0, 10);
-    const sitemap = ['', 'tools.html'].map(p => `  <url><loc>${SITE_URL}${p}</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq></url>`);
+    // one page: games and tools both live at the site root
+    const sitemap = [`  <url><loc>${SITE_URL}</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq></url>`];
     fs.writeFileSync(path.join(root, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemap.join('\n')}\n</urlset>\n`);
 
-    const fill = (file, list) => {
-        const p = path.join(root, file);
-        const html = fs.readFileSync(p, 'utf8');
+    const p = path.join(root, 'index.html');
+    let html = fs.readFileSync(p, 'utf8');
+    const fill = (key, list) => {
         const items = list.filter(x => !x.isAdult).map(x => x.name).sort((a, b) => a.localeCompare(b)).map(n => `<li>${escHtml(n)}</li>`).join('');
-        fs.writeFileSync(p, html.replace(/<!-- name-index -->[\s\S]*?<!-- \/name-index -->/, `<!-- name-index --><ul>${items}</ul><!-- /name-index -->`));
+        const re = new RegExp(`<!-- name-index:${key} -->[\s\S]*?<!-- \/name-index:${key} -->`);
+        html = html.replace(re, `<!-- name-index:${key} --><ul>${items}</ul><!-- /name-index:${key} -->`);
     };
-    fill('index.html', games);
-    fill('tools.html', tools);
+    fill('games', games);
+    fill('tools', tools);
+    fs.writeFileSync(p, html);
 }
 
 // Run build

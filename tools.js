@@ -9,9 +9,12 @@ let displayedTools = [];
 let showAdultContent = false;
 
 // DOM Elements
-const $ = (id) => document.getElementById(id);
+// Tools live in #view-tools of the single page: their element ids carry a t- prefix
+const SHARED_IDS = new Set(['navToolCount']);
+const $ = (id) => document.getElementById(SHARED_IDS.has(id) ? id : 't-' + id);
+const view = document.getElementById('view-tools');
 const searchInput = $('searchInput');
-const searchBox = document.querySelector('.search-box');
+const searchBox = view.querySelector('.search-box');
 const typeFilter = $('typeFilter');
 const sortSelect = $('sortSelect');
 const toolsGrid = $('toolsGrid');
@@ -61,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         searchBox.classList.toggle('has-value', searchInput.value !== '');
         handleSearch();
     });
-    document.querySelector('.search-clear').addEventListener('click', (e) => {
+    view.querySelector('.search-clear').addEventListener('click', (e) => {
         e.preventDefault();
         searchInput.value = '';
         searchBox.classList.remove('has-value');
@@ -140,13 +143,18 @@ function handleAdultToggle() {
     }
 }
 
-function setAdult(value) {
+function setAdult(value, fromOtherView = false) {
     showAdultContent = value;
     localStorage.setItem('showAdultContent', String(value));
     adultContentToggle.checked = value;
     updateAfterDarkButton();
     handleSearch();
+    // games and tools live on the same page: keep both +18 toggles in sync
+    if (!fromOtherView) window.dispatchEvent(new CustomEvent('adult-change', { detail: { value, source: 'tools' } }));
 }
+window.addEventListener('adult-change', (e) => {
+    if (e.detail.source !== 'tools' && e.detail.value !== showAdultContent) setAdult(e.detail.value, true);
+});
 
 function confirmAge() {
     closeOverlay(ageVerificationModal);

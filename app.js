@@ -39,7 +39,8 @@ let modalGame = null;
 // DOM Elements
 const $ = (id) => document.getElementById(id);
 const searchInput = $('searchInput');
-const searchBox = document.querySelector('.search-box');
+const view = document.getElementById('view-games');
+const searchBox = view.querySelector('.search-box');
 const sortSelect = $('sortSelect');
 const gamesGrid = $('gamesGrid');
 const gameCount = $('gameCount');
@@ -92,7 +93,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         searchBox.classList.toggle('has-value', searchInput.value !== '');
         handleSearch();
     });
-    document.querySelector('.search-clear').addEventListener('click', (e) => {
+    view.querySelector('.search-clear').addEventListener('click', (e) => {
         e.preventDefault();
         searchInput.value = '';
         searchBox.classList.remove('has-value');
@@ -170,13 +171,18 @@ function handleAdultToggle() {
     }
 }
 
-function setAdult(value) {
+function setAdult(value, fromOtherView = false) {
     showAdultContent = value;
     localStorage.setItem('showAdultContent', String(value));
     adultContentToggle.checked = value;
     updateAfterDarkButton();
     handleSearch();
+    // games and tools live on the same page: keep both +18 toggles in sync
+    if (!fromOtherView) window.dispatchEvent(new CustomEvent('adult-change', { detail: { value, source: 'games' } }));
 }
+window.addEventListener('adult-change', (e) => {
+    if (e.detail.source !== 'games' && e.detail.value !== showAdultContent) setAdult(e.detail.value, true);
+});
 
 function confirmAge() {
     closeOverlay(ageVerificationModal);

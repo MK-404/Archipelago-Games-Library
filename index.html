@@ -36,10 +36,10 @@
     <div class="container">
         <header>
             <div class="header-top">
-                <a class="brand" href="index.html"><img src="icons/archipelago-logo.png" alt="">Archipelago</a>
+                <a class="brand" href="./" data-view="games"><img src="icons/archipelago-logo.png" alt="">Archipelago</a>
                 <nav class="page-nav" aria-label="Sections">
-                    <a href="index.html" class="nav-link active">Games <span class="nav-count" id="navGameCount"></span></a>
-                    <a href="tools.html" class="nav-link highlight">Tools &amp; More <span class="nav-new">New</span></a>
+                    <a href="./" class="nav-link active" data-view="games">Games <span class="nav-count" id="navGameCount"></span></a>
+                    <a href="./#tools" class="nav-link highlight" data-view="tools">Tools &amp; More <span class="nav-count" id="navToolCount"></span></a>
                 </nav>
                 <div class="discord-links">
                     <a class="discord-button" href="https://discord.gg/archipelago" target="_blank" rel="noopener noreferrer"
@@ -60,58 +60,113 @@
                     </div>
                 </div>
             </div>
-            <div class="page-title">
-                <div><span class="ribbon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Archipelago<br>Games Library</h1><p class="page-intro">Every game you can play in an Archipelago multiworld randomizer, with status, downloads and setup guides.</p></div>
-                <span id="lastUpdate" class="last-update"></span>
-            </div>
-            <div class="controls">
-                <label class="search-box"><span data-ico="search"></span>
-                    <input id="searchInput" type="text" placeholder="Search games…" autocomplete="off" aria-label="Search games">
-                    <button class="search-clear" type="button" aria-label="Clear search" data-ico="close"></button>
-                </label>
-                <div class="select-box">
-                    <select id="sortSelect" aria-label="Sort">
-                        <option value="default">Default</option>
-                        <option value="votes">By Votes</option>
-                        <option value="alpha-asc">A → Z</option>
-                        <option value="alpha-desc">Z → A</option>
-                        <option value="status">By Status</option>
-                        <option value="date-newest">Newest First</option>
-                        <option value="date-oldest">Oldest First</option>
-                    </select><span data-ico="chevron"></span>
-                </div>
-                <label class="adult-toggle">
-                    <span class="toggle-switch"><input type="checkbox" id="adultContentToggle"><span class="toggle-slider"></span></span>
-                    <span class="toggle-label">Show +18</span>
-                </label>
-                <div class="stats">
-                    <span class="online-counter"><span class="online-dot"></span><b id="onlineCount">0</b> <span class="online-label">online</span></span>
-                    <span id="gameCount"><b>0</b> games</span>
-                </div>
-            </div>
-            <div class="filter-chips" role="group" aria-label="Filter by status" id="filterChips">
-                <button class="chip" aria-pressed="true" data-filter="all">All <span class="chip-count"></span></button>
-                <button class="chip st-stable" aria-pressed="false" data-filter="Stable"><span class="chip-pip"></span>Stable <span class="chip-count"></span></button>
-                <button class="chip st-unstable" aria-pressed="false" data-filter="Unstable"><span class="chip-pip"></span>Unstable <span class="chip-count"></span></button>
-                <button class="chip st-broken" aria-pressed="false" data-filter="Broken on Main"><span class="chip-pip"></span>Broken <span class="chip-count"></span></button>
-                <button class="chip" aria-pressed="false" data-filter="core">Core <span class="chip-count"></span></button>
-                <button class="chip hidden" aria-pressed="false" data-filter="favorites">★ Favorites <span class="chip-count"></span></button>
-            </div>
         </header>
 
-        <main id="gamesGrid" class="games-grid">
-            <div id="loadingMessage" class="loading-message"><span class="loading-spinner"></span>Loading games…</div>
-        </main>
-        <div id="errorMessage" class="error-message hidden">
-            <h3 class="state-title">Couldn't load the library</h3>
-            <p id="errorText"></p>
-            <button class="btn" type="button" onclick="location.reload()">Try again</button>
+        <div id="view-games" class="view">
+                <div class="page-title">
+                    <div><span class="ribbon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Archipelago<br>Games Library</h1><p class="page-intro">Every game you can play in an Archipelago multiworld randomizer, with status, downloads and setup guides.</p></div>
+                    <span id="lastUpdate" class="last-update"></span>
+                </div>
+                <div class="controls">
+                    <label class="search-box"><span data-ico="search"></span>
+                        <input id="searchInput" class="search-input" type="text" placeholder="Search games…" autocomplete="off" aria-label="Search games">
+                        <button class="search-clear" type="button" aria-label="Clear search" data-ico="close"></button>
+                    </label>
+                    <div class="select-box">
+                        <select id="sortSelect" aria-label="Sort">
+                            <option value="default">Default</option>
+                            <option value="votes">By Votes</option>
+                            <option value="alpha-asc">A → Z</option>
+                            <option value="alpha-desc">Z → A</option>
+                            <option value="status">By Status</option>
+                            <option value="date-newest">Newest First</option>
+                            <option value="date-oldest">Oldest First</option>
+                        </select><span data-ico="chevron"></span>
+                    </div>
+                    <label class="adult-toggle">
+                        <span class="toggle-switch"><input type="checkbox" id="adultContentToggle"><span class="toggle-slider"></span></span>
+                        <span class="toggle-label">Show +18</span>
+                    </label>
+                    <div class="stats">
+                        <span class="online-counter"><span class="online-dot"></span><b id="onlineCount">0</b> <span class="online-label">online</span></span>
+                        <span id="gameCount"><b>0</b> games</span>
+                    </div>
+                </div>
+                <div class="filter-chips" role="group" aria-label="Filter by status" id="filterChips">
+                    <button class="chip" aria-pressed="true" data-filter="all">All <span class="chip-count"></span></button>
+                    <button class="chip st-stable" aria-pressed="false" data-filter="Stable"><span class="chip-pip"></span>Stable <span class="chip-count"></span></button>
+                    <button class="chip st-unstable" aria-pressed="false" data-filter="Unstable"><span class="chip-pip"></span>Unstable <span class="chip-count"></span></button>
+                    <button class="chip st-broken" aria-pressed="false" data-filter="Broken on Main"><span class="chip-pip"></span>Broken <span class="chip-count"></span></button>
+                    <button class="chip" aria-pressed="false" data-filter="core">Core <span class="chip-count"></span></button>
+                    <button class="chip hidden" aria-pressed="false" data-filter="favorites">★ Favorites <span class="chip-count"></span></button>
+                </div>
+            <main id="gamesGrid" class="games-grid">
+                <div id="loadingMessage" class="loading-message"><span class="loading-spinner"></span>Loading games…</div>
+            </main>
+            <div id="errorMessage" class="error-message hidden">
+                <h3 class="state-title">Couldn't load the library</h3>
+                <p id="errorText"></p>
+                <button class="btn" type="button" onclick="location.reload()">Try again</button>
+            </div>
+
+            <details class="name-index"><summary>All games A–Z</summary><!-- name-index:games --><!-- /name-index:games --></details>
         </div>
 
-        <details class="name-index"><summary>All games A–Z</summary><!-- name-index --><!-- /name-index --></details>
+        <div id="view-tools" class="view" hidden>
+                <div class="page-title">
+                    <div><span class="ribbon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span><h1>Tools, Meta<br>&amp; Hint Games</h1><p class="page-intro">Trackers, clients, meta games and hint games that work alongside your Archipelago multiworld.</p></div>
+                    <span id="t-lastUpdate" class="last-update"></span>
+                </div>
+                <div class="controls">
+                    <label class="search-box"><span data-ico="search"></span>
+                        <input id="t-searchInput" class="search-input" type="text" placeholder="Search tools…" autocomplete="off" aria-label="Search tools">
+                        <button class="search-clear" type="button" aria-label="Clear search" data-ico="close"></button>
+                    </label>
+                    <select id="t-typeFilter" class="sr-only" aria-hidden="true" tabindex="-1">
+                        <option value="all">All Types</option>
+                        <option value="Tool">Tools</option>
+                        <option value="Meta Game">Meta Games</option>
+                        <option value="Hint Game">Hint Games</option>
+                    </select>
+                    <div class="select-box">
+                        <select id="t-sortSelect" aria-label="Sort">
+                            <option value="default">Default</option>
+                            <option value="alpha-asc">A → Z</option>
+                            <option value="alpha-desc">Z → A</option>
+                            <option value="type">By Type</option>
+                            <option value="date-newest">Newest First</option>
+                            <option value="date-oldest">Oldest First</option>
+                        </select><span data-ico="chevron"></span>
+                    </div>
+                    <label class="adult-toggle">
+                        <span class="toggle-switch"><input type="checkbox" id="t-adultContentToggle"><span class="toggle-slider"></span></span>
+                        <span class="toggle-label">Show +18</span>
+                    </label>
+                    <div class="stats">
+                        <span id="t-toolCount"><b>0</b> items</span>
+                    </div>
+                </div>
+                <div class="filter-chips" role="group" aria-label="Filter by type" id="t-filterChips">
+                    <button class="chip" aria-pressed="true" data-filter="all">All <span class="chip-count"></span></button>
+                    <button class="chip type-tool" aria-pressed="false" data-filter="Tool"><span data-ico="tool"></span>Tools <span class="chip-count"></span></button>
+                    <button class="chip type-meta" aria-pressed="false" data-filter="Meta Game"><span data-ico="meta"></span>Meta Games <span class="chip-count"></span></button>
+                    <button class="chip type-hint" aria-pressed="false" data-filter="Hint Game"><span data-ico="hint"></span>Hint Games <span class="chip-count"></span></button>
+                </div>
+            <main id="t-toolsGrid" class="games-grid">
+                <div id="t-loadingMessage" class="loading-message"><span class="loading-spinner"></span>Loading tools…</div>
+            </main>
+            <div id="t-errorMessage" class="error-message hidden">
+                <h3 class="state-title">Couldn't load the library</h3>
+                <p id="t-errorText"></p>
+                <button class="btn" type="button" onclick="location.reload()">Try again</button>
+            </div>
+
+            <details class="name-index"><summary>All tools A–Z</summary><!-- name-index:tools --><!-- /name-index:tools --></details>
+        </div>
+
         <footer class="site-footer">
             <div style="display:flex;align-items:center;gap:12px"><span class="ribbon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
-                <span>Community-maintained list of <a href="https://archipelago.gg" target="_blank" rel="noopener noreferrer">Archipelago</a> games · data from the <a href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw" target="_blank" rel="noopener noreferrer">official spreadsheet</a></span></div>
+                <span>Community-maintained list of <a href="https://archipelago.gg" target="_blank" rel="noopener noreferrer">Archipelago</a> games and tools · data from the <a href="https://docs.google.com/spreadsheets/d/1iuzDTOAvdoNe8Ne8i461qGNucg5OuEoF-Ikqs8aUQZw" target="_blank" rel="noopener noreferrer">official spreadsheet</a></span></div>
             <div class="secret-container">
                 <button id="eggSpawnBtn" class="secret-button egg-spawn-btn" type="button" onclick="window.spawnEasterEgg && window.spawnEasterEgg()">🥚 Spawn Easter Egg</button>
                 <button class="secret-button" type="button" onclick="window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ','_blank')">Secret button yay</button>
@@ -186,6 +241,65 @@
         </div>
     </div>
 
+    <!-- Age Verification Modal -->
+    <div id="t-ageVerificationModal" class="modal-overlay age-verification" role="dialog" aria-modal="true" aria-labelledby="t-ageTitle">
+        <div class="modal-content age-modal">
+            <button class="modal-close" id="t-ageClose" aria-label="Close" data-ico="close"></button>
+            <div class="age-mark">18+</div>
+            <h2 id="t-ageTitle" class="age-modal-title">Age Verification Required</h2>
+            <p class="age-modal-text">By enabling this option, you confirm that you are of legal age in your jurisdiction.
+                Content marked as 18+ may contain sensitive themes.</p>
+            <div class="age-modal-effects">
+                <div><span data-ico="eye"></span><span>Shows <b>18+ tools</b> in the list</span></div>
+                <div><span data-ico="check"></span><span>You can turn it off again at any time</span></div>
+            </div>
+            <div class="age-modal-buttons">
+                <button id="t-ageConfirmYes" class="age-button age-yes">Yes, I am of legal age</button>
+                <button id="t-ageConfirmNo" class="age-button age-no">No, I am not</button>
+            </div>
+            <p class="age-modal-hint"><span class="kbd">Esc</span> or a click outside = No</p>
+        </div>
+    </div>
+
+    <!-- Tool Detail Modal -->
+    <div id="t-toolModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="t-modalTitle">
+        <div class="modal-content">
+            <button id="t-modalClose" class="modal-close" aria-label="Close" data-ico="close"></button>
+            <div class="modal-scroll">
+                <div id="t-modalBanner" class="modal-banner no-banner"></div>
+                <div class="modal-head">
+                    <div class="modal-poster" id="t-modalPoster"></div>
+                    <div class="modal-heading">
+                        <h2 id="t-modalTitle" class="modal-title"></h2>
+                        <div class="modal-status-row">
+                            <span id="t-modalType" class="tool-type-badge"></span>
+                            <span id="t-modalNew" class="new-badge">New</span>
+                            <span id="t-modalAdult" class="adult-badge">18+</span>
+                            <span id="t-modalAdded" class="modal-added"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <aside class="modal-side">
+                        <dl class="modal-facts">
+                            <div><dt>Type</dt><dd id="t-factType"></dd></div>
+                            <div><dt>Added</dt><dd id="t-factAdded"></dd></div>
+                            <div id="t-factAiRow" class="ai-fact" hidden><dt>AI use</dt><dd></dd></div>
+                        </dl>
+                        <p id="t-factAiNote" class="ai-note" hidden></p>
+                        <a id="t-artworkLink" class="artwork-link" target="_blank" rel="noopener noreferrer"><span data-ico="image"></span><span></span></a>
+                    </aside>
+                    <div class="modal-main">
+                        <section id="t-modalLinksSection" class="modal-section wide" hidden><h3 class="modal-section-title"><span data-ico="download"></span>Links &amp; Downloads</h3><div id="t-modalLinks" class="modal-links"></div></section>
+                        <section id="t-modalSupportSection" class="modal-section" hidden><h3 class="modal-section-title"><span data-ico="chat"></span>Support</h3><div id="t-modalSupport" class="modal-links"></div></section>
+                        <section id="t-modalNotesSection" class="modal-section" hidden><h3 class="modal-section-title"><span data-ico="note"></span>Notes</h3><div id="t-modalNotes" class="modal-notes"></div></section>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" id="t-modalFooter"></div>
+        </div>
+    </div>
+
     <div id="toast" class="toast" role="status"></div>
     <div id="bgToggle" class="bg-toggle" title="Toggle background animation">HD</div>
 
@@ -194,7 +308,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <!-- Supabase (online counter) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script type="module" src="views.js"></script>
     <script type="module" src="app.js"></script>
+    <script type="module" src="tools.js"></script>
     <script type="module" src="bg-animation.js"></script>
 </body>
 
