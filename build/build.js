@@ -962,6 +962,11 @@ async function build() {
         console.log(`\nEaster eggs: ${easterEggs.length} PNG files indexed`);
     }
 
+    // === README badges (shields.io endpoint format) ===
+    const badge = (label, n) => JSON.stringify({ schemaVersion: 1, label, message: String(n), color: 'blue' });
+    fs.writeFileSync(path.join(CONFIG.OUTPUT_DIR, 'badge-games.json'), badge('games', uniqueGames.length));
+    fs.writeFileSync(path.join(CONFIG.OUTPUT_DIR, 'badge-tools.json'), badge('tools', uniqueTools.length));
+
     // === SEO: sitemap + plain name lists in the HTML (only on CI, so local builds don't touch the pages) ===
     if (process.env.CI) {
         writeSeoFiles(uniqueGames, uniqueTools);
