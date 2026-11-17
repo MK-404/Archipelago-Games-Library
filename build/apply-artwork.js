@@ -9,7 +9,6 @@ const { toWebp } = require('./optimize-images');
 const ROOT = path.join(__dirname, '..');
 const MAX_BYTES = 5 * 1024 * 1024;
 const EXTS = ['.jpg', '.png', '.webp', '.jpeg'];
-const ALLOWED_HOSTS = ['github.com', 'user-images.githubusercontent.com', 'private-user-images.githubusercontent.com', 'cdn2.steamgriddb.com'];
 
 // Same as sanitizeFilename() in build.js — keep in sync
 function sanitizeFilename(name) {
@@ -34,13 +33,16 @@ function parseIssueForm(body) {
     return fields;
 }
 
+// Accepts an image dropped into the issue, a markdown/HTML image, a full link or a bare one
+// ("cdn2.steamgriddb.com/grid/…"). Any host is fine: the owner approves every issue by hand and
+// the file is checked to be a real image and re-encoded before it's saved.
 function findImageUrl(text) {
     if (!text) return null;
-    const m = text.match(/!\[[^\]]*\]\((https:\/\/[^)\s]+)\)/) || text.match(/src="(https:\/\/[^"]+)"/) || text.match(/(https:\/\/\S+)/);
+    const m = text.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/) || text.match(/src="(https?:\/\/[^"]+)"/) ||
+        text.match(/(https?:\/\/\S+)/) || text.match(/\b((?:[a-z0-9-]+\.)+[a-z]{2,}\/\S+)/i);
     if (!m) throw new Error(`No image or link found in: "${text.slice(0, 80)}"`);
-    const url = new URL(m[1]);
-    if (!ALLOWED_HOSTS.includes(url.hostname)) throw new Error(`Links from ${url.hostname} are not accepted. Drag the image into the issue or use a cdn2.steamgriddb.com link.`);
-    if (url.hostname === 'github.com' && !url.pathname.startsWith('/user-attachments/')) throw new Error('Only images uploaded to the issue are accepted from github.com.');
+    const url = new URL(/^https?:\/\//i.test(m[1]) ? m[1] : 'https://' + m[1]);
+    if (/^(localhost|\d+\.\d+\.\d+\.\d+|\[.*\])$/i.test(url.hostname)) throw new Error('That link is not a public website.');
     return url.href;
 }
 
@@ -58,7 +60,7 @@ async function download(url) {
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.length > MAX_BYTES) throw new Error('Image is larger than 5 MB');
     const ext = detectExt(buf);
-    if (!ext) throw new Error('The file is not a PNG, JPG or WEBP image');
+    if (!ext) throw new Error('The link is not a PNG, JPG or WEBP image. Use the direct image link (right click on the image → Copy image address).');
     return { buf, ext };
 }
 

@@ -10,7 +10,7 @@ body:
 
         **Cover:** vertical, 2:3 ratio (ideally 600×900).
         **Banner:** horizontal, wide (ideally 1920×620).
-        PNG, JPG or WEBP, max 5 MB. Drag the image into the box below, or paste a direct link from SteamGridDB (`cdn2.steamgriddb.com/...`).
+        PNG, JPG or WEBP, max 5 MB. Drag the image into the box below, or paste a direct link to the image (for example from SteamGridDB: right click on the image → Copy image address).
   - type: input
     id: name
     attributes:
