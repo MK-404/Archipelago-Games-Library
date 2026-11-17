@@ -487,7 +487,7 @@ function pixel(env) {
   const { W, H, theme, rnd, mobile } = env;
   const cell = mobile ? 5 : 6, gw = Math.ceil(W / cell), gh = Math.ceil(H / cell) + 1;
   const noise = makeNoise(rnd), sc = 1 / (22 + rnd() * 16), sea = 0.57 + rnd() * 0.05;
-  const rise = env.rise || 'none', speed = env.scrollSpeed || 0;
+  const rise = env.rise || 'none', speed = env.scrollSpeed || 0, anchored = !!env.anchored;
   const RISE = rise !== 'none', STAGGER = rise.includes('stagger'), BOUNCE = rise.includes('bounce');
   const DUR = BOUNCE ? 1.5 : 1.6, DROP = 0.3, HALO = -0.09;
   const L = theme.bgL, S = theme.bgS, hu = theme.hue;
@@ -593,6 +593,9 @@ function pixel(env) {
       set(b.x, b.y, BOAT); set(b.x + (Math.abs(dx) > Math.abs(dy) ? Math.sign(dx) : 0), b.y + (Math.abs(dx) > Math.abs(dy) ? 0 : Math.sign(dy)), BOAT);
     }
     gg.putImageData(img, 0, 0);
+    scene.dirty = true;
+    // anchored: the canvas sits in the page at the sprite's rows and scrolls natively with it
+    if (anchored) env.layout(top * cell, GH * cell);
   }
   const isWater = (x, y) => kindOf(row(Math.floor(y))[mod(Math.floor(x), gw)] - sea) <= 1;
   function placeBoat(b) {
@@ -601,8 +604,11 @@ function pixel(env) {
     return b;
   }
   const boats = Array.from({ length: mobile ? 3 : 6 }, () => placeBoat({ a: rnd() * TAU, v: 0.9 + rnd() * 0.8 }));
-  paint();
-  return {
+  const outOfRows = (par) => Math.abs((par.sy * speed) / cell - gbase) > B - 2;
+  const scene = {
+    dirty: true,
+    // anchored: scrolling only needs a redraw when the spare rows run out
+    needsDraw: (par) => anchored ? outOfRows(par) : (par.sy * speed) / cell !== off,
     update(dt) {
       tt += dt; acc += dt;
       for (const b of boats) {
@@ -616,11 +622,15 @@ function pixel(env) {
     draw(ctx, par) {
       off = speed ? (par.sy * speed) / cell : 0;
       if (Math.abs(off - gbase) > B - 2) paint();
+      const y = anchored ? 0 : Math.round(-(B + off - gbase) * cell * env.S) / env.S;
       ctx.imageSmoothingEnabled = false;
-      ctx.globalAlpha = 1; ctx.drawImage(grid, 0, Math.round(-(B + off - gbase) * cell * env.S) / env.S, gw * cell, GH * cell);
+      ctx.globalAlpha = 1; ctx.drawImage(grid, 0, y, gw * cell, GH * cell);
       ctx.imageSmoothingEnabled = true;
     },
   };
+  off = speed ? (env.scrollY * speed) / cell : 0;
+  paint();
+  return scene;
 }
 
 /* ------------------------------------------------------------------ Archipelago vocabulary (generic, no game IP) */
@@ -815,16 +825,29 @@ const STYLE_SCALE = { stars: 1, multiworld: 1, mail: 1 };   // stars need crisp 
 export function createBackground(canvas, opts = {}) {
   const o = { style: STYLE, seed: 1, fps: FPS, renderScale: RENDER_SCALE, eggImages: [], pointerTarget: window, scrollTarget: window, eggChance: EGG_CHANCE, rise: 'none', scrollSpeed: 0, ...opts };
   const ctx = canvas.getContext('2d');
-  const env = { animated: true, rebuild: false, rise: o.rise, scrollSpeed: o.scrollSpeed, W: 1, H: 1, S: o.renderScale, q: o.renderScale, theme: null, rnd: null, mobile: false, spawned: () => { if (Date.now() - lastEgg > EGG_COOLDOWN && Math.random() < o.eggChance && spawnEgg()) lastEgg = Date.now(); }, log: (m) => o.onLog && o.onLog(m) };
+  const env = { animated: true, rebuild: false, anchored: false, top: 0, CH: 0, scrollY: 0, layout: null, rise: o.rise, scrollSpeed: o.scrollSpeed, W: 1, H: 1, S: o.renderScale, q: o.renderScale, theme: null, rnd: null, mobile: false, spawned: () => { if (Date.now() - lastEgg > EGG_COOLDOWN && Math.random() < o.eggChance && spawnEgg()) lastEgg = Date.now(); }, log: (m) => o.onLog && o.onLog(m) };
   let lastEgg = 0, scene = null, raf = 0, last = 0, acc = 0, running = false, tt = 0, drawnSy = NaN;
   const par = { px: 0, py: 0, tx: 0, ty: 0, sy: 0 };
   const eggs = [], eggImgs = [];
   o.eggImages.forEach((src) => { const im = new Image(); im.decoding = 'async'; im.onload = () => eggImgs.push(im); im.src = src; });
 
+  // Anchored mode (pixel map moving 1:1 with the page): the canvas lives in the page and the
+  // browser scrolls it together with the content, so it can never lag behind the cards.
+  // Only when the spare rows run out is it repainted and moved (env.layout).
+  const layer = canvas.parentElement && canvas.parentElement.id === 'bgLayer' ? canvas.parentElement : null;
+  function layout(top, h) {
+    if (h !== env.CH) { env.CH = h; canvas.style.height = h + 'px'; canvas.height = Math.round(h * env.S); }
+    env.top = top; canvas.style.transform = `translate3d(0, ${top}px, 0)`;
+  }
   function build() {
+    readScroll();
+    env.anchored = !!layer && o.style === 'pixel' && o.scrollSpeed === 1;
+    if (layer) layer.classList.toggle('anchored', env.anchored);
     // client size ignores CSS transforms on ancestors
-    env.W = Math.max(1, canvas.clientWidth); env.H = Math.max(1, canvas.clientHeight); env.mobile = env.W < 480;
+    env.W = Math.max(1, canvas.clientWidth); env.H = Math.max(1, env.anchored ? window.innerHeight : canvas.clientHeight); env.mobile = env.W < 480;
     env.S = env.q = STYLE_SCALE[o.style] ?? o.renderScale;
+    env.scrollY = par.sy; env.CH = 0; env.layout = env.anchored ? layout : null;
+    if (!env.anchored) canvas.style.removeProperty('height'), canvas.style.removeProperty('transform');
     canvas.width = Math.round(env.W * env.S); canvas.height = Math.round(env.H * env.S);
     env.theme = themeFromSeed(o.seed);
     env.rnd = mulberry32(((o.seed * 2654435761) ^ (o.style.length * 0x9e3779b9)) >>> 0);
@@ -855,11 +878,13 @@ export function createBackground(canvas, opts = {}) {
   function draw() {
     drawnSy = par.sy;
     ctx.setTransform(env.S, 0, 0, env.S, 0, 0);
-    ctx.clearRect(0, 0, env.W, env.H);
+    ctx.clearRect(0, 0, env.W, env.anchored ? env.CH : env.H);
     scene.draw(ctx, par);
+    if (scene.dirty !== undefined) scene.dirty = false;
+    const ey = env.anchored ? par.sy - env.top : 0;   // eggs fly in screen space
     for (const e of eggs) {
       ctx.globalAlpha = 0.8;
-      ctx.setTransform(env.S * Math.cos(e.rot), env.S * Math.sin(e.rot), -env.S * Math.sin(e.rot), env.S * Math.cos(e.rot), e.x * env.S, e.y * env.S);
+      ctx.setTransform(env.S * Math.cos(e.rot), env.S * Math.sin(e.rot), -env.S * Math.sin(e.rot), env.S * Math.cos(e.rot), e.x * env.S, (e.y + ey) * env.S);
       ctx.drawImage(e.im, -e.w / 2, -e.h / 2, e.w, e.h);
     }
     ctx.setTransform(env.S, 0, 0, env.S, 0, 0); ctx.globalAlpha = 1;
@@ -868,9 +893,11 @@ export function createBackground(canvas, opts = {}) {
     raf = requestAnimationFrame(frame);
     const dt = last ? (now - last) / 1000 : 0; last = now; acc += dt;
     readScroll();
-    if (acc < 1 / o.fps - 0.004) { if (par.sy !== drawnSy) draw(); return; }   // scrolling stays smooth between frames
-    step(Math.min(acc, 0.1)); acc = 0; draw();
+    if (acc < 1 / o.fps - 0.004) { if (needsDraw()) draw(); return; }   // scrolling stays smooth between frames
+    step(Math.min(acc, 0.1)); acc = 0;
+    if (scene.dirty !== false || eggs.length || needsDraw()) draw();   // nothing changed → no redraw
   }
+  const needsDraw = () => scene.needsDraw ? scene.needsDraw(par) : par.sy !== drawnSy;
   const onPointer = (e) => {
     if (e.pointerType && e.pointerType !== 'mouse') return;
     const r = canvas.getBoundingClientRect();
@@ -878,15 +905,19 @@ export function createBackground(canvas, opts = {}) {
     par.ty = clamp(((e.clientY - r.top) / r.height) * 2 - 1, -1, 1);
   };
   const readScroll = () => { par.sy = o.scrollTarget === window ? window.scrollY : o.scrollTarget ? o.scrollTarget.scrollTop : 0; };
-  const onScroll = () => { readScroll(); if (!running) draw(); };
+  const onScroll = () => { readScroll(); if (!running && needsDraw()) draw(); };
   o.pointerTarget && o.pointerTarget.addEventListener('pointermove', onPointer, { passive: true });
   o.scrollTarget && o.scrollTarget.addEventListener('scroll', onScroll, { passive: true });
   let rt = 0;
-  const ro = new ResizeObserver(() => {
-    if (canvas.clientWidth === env.W && canvas.clientHeight === env.H) return;   // initial callback / no real change
-    clearTimeout(rt); rt = setTimeout(() => { build(); if (!running) draw(); }, 150);
-  });
+  const onResize = () => {
+    const w = canvas.clientWidth, h = env.anchored ? window.innerHeight : canvas.clientHeight;
+    // anchored: small height changes (mobile URL bar) are covered by the spare rows
+    if (w === env.W && (env.anchored ? h <= env.H && h > env.H - 160 : h === env.H)) return;
+    clearTimeout(rt); rt = setTimeout(() => { build(); draw(); }, 150);
+  };
+  const ro = new ResizeObserver(onResize);
   ro.observe(canvas);
+  window.addEventListener('resize', onResize, { passive: true });
   build();
 
   return {
@@ -923,9 +954,25 @@ async function loadEggs() {
     .map((s) => (/^(https?:)?\/\//.test(s) || s.includes('/') ? s : EGG_DIR + s));
 }
 
+function softwareRendering() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl', { failIfMajorPerformanceCaveat: true });
+    if (!gl) return true;
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : '';
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+  } catch { return false; }
+}
+
 async function boot() {
   const canvas = document.getElementById('bgCanvas');
   if (!canvas) return;
+  // the layer clips the canvas to the page so it never makes the page longer
+  if (!canvas.parentElement || canvas.parentElement.id !== 'bgLayer') {
+    const layer = document.createElement('div'); layer.id = 'bgLayer'; layer.setAttribute('aria-hidden', 'true');
+    canvas.replaceWith(layer); layer.appendChild(canvas);
+  }
   const root = document.documentElement;
   const toggle = document.getElementById('bgToggle');
   const eggBtn = document.getElementById('eggSpawnBtn');
@@ -953,7 +1000,9 @@ async function boot() {
 
   // 3. the background itself
   const bg = createBackground(canvas, { seed, style: canvas.dataset.style || STYLE, eggImages: await loadEggs(), onLog, rise: RISE, scrollSpeed: SCROLL_SPEED });
-  let off = store.get('bgAnimationOff') === 'true';
+  // without hardware acceleration the animation starts off (the HD button still turns it on)
+  const saved = store.get('bgAnimationOff');
+  let off = saved === null ? softwareRendering() : saved === 'true';
 
   function apply() {
     root.classList.toggle('bg-off', off);
