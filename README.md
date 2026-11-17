@@ -1,4 +1,7 @@
-# Archipelago Games Library
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-light.png">
+  <img alt="Archipelago Games Library" src="assets/logo-dark.png" width="420">
+</picture>
 
 A searchable list of every game you can play with [Archipelago](https://archipelago.gg), the multiworld randomizer.
 

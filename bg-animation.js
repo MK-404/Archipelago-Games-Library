@@ -849,7 +849,7 @@ export function createBackground(canvas, opts = {}) {
     env.scrollY = par.sy; env.CH = 0; env.layout = env.anchored ? layout : null;
     if (!env.anchored) canvas.style.removeProperty('height'), canvas.style.removeProperty('transform');
     canvas.width = Math.round(env.W * env.S); canvas.height = Math.round(env.H * env.S);
-    env.theme = themeFromSeed(o.seed);
+    env.theme = o.theme || themeFromSeed(o.seed);   // opts.theme: fixed colours (e.g. logo renders)
     env.rnd = mulberry32(((o.seed * 2654435761) ^ (o.style.length * 0x9e3779b9)) >>> 0);
     scene = (CONCEPTS[o.style] || islands)(env);
     env.rebuild = true;   // later rebuilds (resize, seed) don't replay the intro
