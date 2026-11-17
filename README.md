@@ -11,7 +11,7 @@ A searchable list of every game you can play with [Archipelago](https://archipel
 ![Games](https://img.shields.io/endpoint?url=https%3A%2F%2Fmk-404.github.io%2FArchipelago-Games-Library%2Fdata%2Fbadge-games.json&cacheSeconds=3600)
 ![Tools](https://img.shields.io/endpoint?url=https%3A%2F%2Fmk-404.github.io%2FArchipelago-Games-Library%2Fdata%2Fbadge-tools.json&cacheSeconds=3600)
 
-![Archipelago Games Library](og-image.jpg)
+![Archipelago Games Library](assets/screenshot.jpg)
 
 ## What's in it
 

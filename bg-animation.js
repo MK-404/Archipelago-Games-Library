@@ -504,6 +504,21 @@ function pixel(env) {
   // The sprite holds the screen plus B spare rows above and below: scrolling just moves it.
   // It's repainted at 10 fps (water, rising islands) or when the spare rows run out.
   const B = 24, GH = gh + 2 * B;
+  // optional gradient colouring (logo renders): theme.gradient = ['#rrggbb', ...]
+  const hex3 = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const ISLES = Array.isArray(theme.islandColors) && theme.islandColors.length > 0;
+  const ISLEC = ISLES ? new Float32Array(theme.islandColors.flatMap(hex3)) : null, SEAC = new Float32Array(hex3(theme.seaColor || '#6f6f7a'));
+  let isleColor = [];
+  const GRAD = ISLES || (Array.isArray(theme.gradient) && theme.gradient.length > 1), GRADN = 256;
+  const GRADL = theme.gradientShade || [0.2, 0.26, 0.34, 0.66, 0.56, 0.46, 0.62, 0.76];   // brightness per terrain kind
+  const GRADC = new Float32Array(GRADN * 3);
+  if (GRAD && !ISLES) {
+    const stops = theme.gradient.map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+    for (let i = 0; i < GRADN; i++) {
+      const t = (i / (GRADN - 1)) * (stops.length - 1), j = Math.min(stops.length - 2, Math.floor(t)), u = t - j;
+      for (let ch = 0; ch < 3; ch++) GRADC[i * 3 + ch] = stops[j][ch] + (stops[j + 1][ch] - stops[j][ch]) * u;
+    }
+  }
   const grid = sprite(gw, GH), gg = grid.getContext('2d'), img = gg.createImageData(gw, GH), px = img.data;
 
   // Map rows are generated around the screen and dropped far away. An island (land plus the
@@ -532,7 +547,7 @@ function pixel(env) {
     const n = gw * winH;
     if (labels.length !== n) { labels = new Int32Array(n); hs = new Float32Array(n); stack = new Int32Array(n); members = new Int32Array(n); }
     for (let y = 0; y < winH; y++) hs.set(row(winTop + y), y * gw);
-    labels.fill(-1); t0s = [];
+    labels.fill(-1); t0s = []; isleColor = [];
     const scrTop = B + M, scrBot = B + M + gh, instant = !RISE || !env.animated || (!intro && !seenAny);
     for (let i = 0; i < n; i++) {
       if (labels[i] !== -1 || hs[i] - sea < HALO) continue;
@@ -554,6 +569,32 @@ function pixel(env) {
       t0s.push(t0);
     }
     seenAny = true;
+    if (ISLES) colourIsles(n);
+  }
+  // islandColors: land masses (above sea level) are labelled separately. The ones on screen
+  // take the colours in turn (biggest first), so every colour shows up; the rest by hash.
+  let landLab = new Int32Array(0);
+  function colourIsles(n) {
+    if (landLab.length !== n) landLab = new Int32Array(n);
+    landLab.fill(-1); isleColor = [];
+    const scrTop = B + M, scrBot = B + M + gh, info = [];
+    for (let i = 0; i < n; i++) {
+      if (landLab[i] !== -1 || hs[i] - sea < 0) continue;
+      const id = isleColor.length; let sp = 0, size = 0, vis = 0;
+      landLab[i] = id; stack[sp++] = i;
+      while (sp) {
+        const j = stack[--sp], y = (j / gw) | 0, x = j - y * gw;
+        size++; if (y >= scrTop && y < scrBot) vis++;
+        for (const k of [x > 0 ? j - 1 : -1, x < gw - 1 ? j + 1 : -1, y > 0 ? j - gw : -1, y < winH - 1 ? j + gw : -1])
+          if (k >= 0 && landLab[k] === -1 && hs[k] - sea >= 0) { landLab[k] = id; stack[sp++] = k; }
+      }
+      const y0 = (i / gw) | 0, h = Math.sin((winTop + y0) * 12.9898 + (i - y0 * gw) * 78.233) * 43758.5453;
+      isleColor.push(Math.floor((h - Math.floor(h)) * 997));
+      info.push({ id, vis, x0: i - y0 * gw });
+    }
+    const nC = ISLEC.length / 3;
+    info.filter((o) => o.vis >= 6).sort((a, b) => b.vis - a.vis).forEach((o, r) => { isleColor[o.id] = r % nC; });
+    if (typeof window !== 'undefined') window.__isleStats = { visibleIslands: info.filter((o) => o.vis >= 6).length };
   }
   function liftOf(t0) {
     if (!RISE || !env.animated) return 1;
@@ -582,7 +623,17 @@ function pixel(env) {
         } else if (x > 0 && y > 0) {
           const up = prev[x - 1]; f = v - up > 0.004 ? LIT : up - v > 0.004 ? SHADE : 1;
         }
-        const o = (y * gw + x) * 4; px[o] = Math.min(255, c[0] * f); px[o + 1] = Math.min(255, c[1] * f); px[o + 2] = Math.min(255, c[2] * f); px[o + 3] = a;
+        const o = (y * gw + x) * 4;
+        if (GRAD) {
+          // theme.gradient: every pixel takes its colour from the gradient, shaded by terrain
+          const m = (c === FOAM ? (ISLES ? GRADL[2] + 0.04 : 0.62) : c === GLINT ? (ISLES ? GRADL[2] + 0.06 : 0.55) : GRADL[k]) * f;
+          let C3 = GRADC, gi;
+          if (ISLES) {   // theme.islandColors: each island gets one colour, the open sea theme.seaColor
+            const li = k >= 3 ? landLab[lrow + x] : -1;
+            if (li >= 0) { C3 = ISLEC; gi = (isleColor[li] % (ISLEC.length / 3)) * 3; } else { C3 = SEAC; gi = 0; }
+          } else gi = Math.min(GRADN - 1, Math.max(0, Math.round((x + y * 0.35) / (gw + GH * 0.35) * (GRADN - 1)))) * 3;
+          px[o] = Math.min(255, C3[gi] * m); px[o + 1] = Math.min(255, C3[gi + 1] * m); px[o + 2] = Math.min(255, C3[gi + 2] * m); px[o + 3] = 255;
+        } else { px[o] = Math.min(255, c[0] * f); px[o + 1] = Math.min(255, c[1] * f); px[o + 2] = Math.min(255, c[2] * f); px[o + 3] = a; }
       }
       [eff, prev] = [prev, eff];
     }
@@ -603,7 +654,7 @@ function pixel(env) {
     do { b.x = rnd() * gw; b.y = gbase + rnd() * gh; tries++; } while (!isWater(b.x, b.y) && tries < 200);
     return b;
   }
-  const boats = Array.from({ length: mobile ? 3 : 6 }, () => placeBoat({ a: rnd() * TAU, v: 0.9 + rnd() * 0.8 }));
+  const boats = Array.from({ length: theme.boats ?? (mobile ? 3 : 6) }, () => placeBoat({ a: rnd() * TAU, v: 0.9 + rnd() * 0.8 }));
   const outOfRows = (par) => Math.abs((par.sy * speed) / cell - gbase) > B - 2;
   const scene = {
     dirty: true,
@@ -617,7 +668,7 @@ function pixel(env) {
         if (b.x < -2 || b.x > gw + 2) { b.x = mod(b.x, gw); env.spawned(); }
         if (b.y < gbase - B || b.y > gbase + gh + B) placeBoat(b);   // scrolling doesn't roll for eggs
       }
-      if (acc >= 0.1) { acc = 0; paint(); }
+      if (acc >= 0.099) { acc = 0; paint(); }
     },
     draw(ctx, par) {
       off = speed ? (par.sy * speed) / cell : 0;
