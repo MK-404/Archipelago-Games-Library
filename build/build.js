@@ -962,9 +962,34 @@ async function build() {
         console.log(`\nEaster eggs: ${easterEggs.length} PNG files indexed`);
     }
 
+    // === SEO: sitemap + plain name lists in the HTML (only on CI, so local builds don't touch the pages) ===
+    if (process.env.CI) {
+        writeSeoFiles(uniqueGames, uniqueTools);
+        console.log('SEO: sitemap.xml and name lists written');
+    }
+
     console.log(`\nBuild complete!`);
     console.log(`\nTo test: npm run serve`);
     console.log(`Then open: http://localhost:8080`);
+}
+
+const SITE_URL = 'https://mk-404.github.io/Archipelago-Games-Library/';
+const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function writeSeoFiles(games, tools) {
+    const root = path.join(__dirname, '..');
+    const today = new Date().toISOString().slice(0, 10);
+    const sitemap = ['', 'tools.html'].map(p => `  <url><loc>${SITE_URL}${p}</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq></url>`);
+    fs.writeFileSync(path.join(root, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemap.join('\n')}\n</urlset>\n`);
+
+    const fill = (file, list) => {
+        const p = path.join(root, file);
+        const html = fs.readFileSync(p, 'utf8');
+        const items = list.filter(x => !x.isAdult).map(x => x.name).sort((a, b) => a.localeCompare(b)).map(n => `<li>${escHtml(n)}</li>`).join('');
+        fs.writeFileSync(p, html.replace(/<!-- name-index -->[\s\S]*?<!-- \/name-index -->/, `<!-- name-index --><ul>${items}</ul><!-- /name-index -->`));
+    };
+    fill('index.html', games);
+    fill('tools.html', tools);
 }
 
 // Run build
