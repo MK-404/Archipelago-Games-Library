@@ -5,11 +5,11 @@
 
 A searchable list of every game you can play with [Archipelago](https://archipelago.gg), the multiworld randomizer.
 
-**[mk-404.github.io/Archipelago-Games-Library](https://mk-404.github.io/Archipelago-Games-Library/)**
+**[archipelagolibrary.com](https://archipelagolibrary.com/)**
 
 ![Online now](https://img.shields.io/endpoint?url=https%3A%2F%2Farchipelago-games-library-auth.lellone-ciao.workers.dev%2Fonline-badge&cacheSeconds=60)
-![Games](https://img.shields.io/endpoint?url=https%3A%2F%2Fmk-404.github.io%2FArchipelago-Games-Library%2Fdata%2Fbadge-games.json&cacheSeconds=3600)
-![Tools](https://img.shields.io/endpoint?url=https%3A%2F%2Fmk-404.github.io%2FArchipelago-Games-Library%2Fdata%2Fbadge-tools.json&cacheSeconds=3600)
+![Games](https://img.shields.io/endpoint?url=https%3A%2F%2Farchipelagolibrary.com%2Fdata%2Fbadge-games.json&cacheSeconds=3600)
+![Tools](https://img.shields.io/endpoint?url=https%3A%2F%2Farchipelagolibrary.com%2Fdata%2Fbadge-tools.json&cacheSeconds=3600)
 
 ![Archipelago Games Library](assets/screenshot.jpg)
 

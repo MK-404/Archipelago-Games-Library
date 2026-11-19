@@ -978,7 +978,7 @@ async function build() {
     console.log(`Then open: http://localhost:8080`);
 }
 
-const SITE_URL = 'https://mk-404.github.io/Archipelago-Games-Library/';
+const SITE_URL = 'https://archipelagolibrary.com/';
 const escHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function writeSeoFiles(games, tools) {
