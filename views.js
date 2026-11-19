@@ -2,7 +2,7 @@
 // Old links keep working: index.html is dropped from the address bar, tools.html redirects here.
 
 const VIEWS = {
-    games: { el: document.getElementById('view-games'), title: 'Archipelago Games Library' },
+    games: { el: document.getElementById('view-games'), title: 'Archipelago Games Library – Full Game List' },
     tools: { el: document.getElementById('view-tools'), title: 'Archipelago Tools, Meta & Hint Games' },
 };
 const navLinks = document.querySelectorAll('[data-view]');
