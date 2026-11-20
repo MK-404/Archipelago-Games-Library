@@ -80,8 +80,8 @@ jobs:
         run: |
           rsync -a ./ _site/ \
             --exclude .git --exclude .github --exclude .claude --exclude .vscode \
-            --exclude node_modules --exclude build --exclude extract --exclude v2 --exclude _site \
-            --exclude package.json --exclude package-lock.json --exclude cf-worker.js \
+            --exclude node_modules --exclude build --exclude extract --exclude v2 --exclude _site --exclude worker \
+            --exclude package.json --exclude package-lock.json \
             --exclude todo.txt --exclude .gitignore
           du -sh _site
 

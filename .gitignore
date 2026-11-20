@@ -45,3 +45,7 @@ todo.txt
 sitemap.xml
 data/badge-games.json
 data/badge-tools.json
+
+# Cloudflare worker local files
+worker/.dev.vars
+worker/.wrangler/

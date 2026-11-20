@@ -2,25 +2,12 @@
 import * as UI from './archipelago-ui.js';
 
 const DISCORD_CLIENT_ID = '1517486577381806231';
+// Cloudflare worker: Discord login, favorites/votes and the online counter (worker/ in this repo).
+// On localhost the site talks to `wrangler dev` instead.
+const WORKER_URL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+    ? 'http://localhost:8787'
+    : 'https://archipelago-games-library-auth.lellone-ciao.workers.dev';
 const DISCORD_WORKER_CALLBACK = 'https://archipelago-games-library-auth.lellone-ciao.workers.dev/discord/callback';
-// ============================
-
-const firebaseConfig = {
-    apiKey: "AIzaSyCx61otmpsts6xwQoeDqs_Nv6tv70ncdxE",
-    authDomain: "archipelago-games-library.firebaseapp.com",
-    projectId: "archipelago-games-library",
-    storageBucket: "archipelago-games-library.firebasestorage.app",
-    messagingSenderId: "209146086324",
-    appId: "1:209146086324:web:6935953023edad7eda28e1"
-};
-// ============================
-
-const SUPABASE_URL = 'https://thcojeibhdywdohmfoxa.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoY29qZWliaGR5d2RvaG1mb3hhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4NjY5NjQsImV4cCI6MjA5NzQ0Mjk2NH0.sxWuwRRp9uQrW9hiXFa0-CEIzLr99hHqLmXyyFgMZp8';
-// ============================
-
-try { firebase.initializeApp(firebaseConfig); } catch (e) { }
-const db = firebase.firestore();
 
 const LINK_ICONS = { github: 'icons/github-logo.png', discord: 'icons/discord-logo.png', archipelago: 'icons/archipelago-logo.png' };
 const CORE_ICON = 'icons/archipelago-logo.png';
@@ -78,7 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
         const tasks = [loadGamesData(), loadVoteCounts()];
-        if (currentUser) tasks.push(loadUserData(currentUser.id));
+        if (currentUser) tasks.push(loadUserData());
         await Promise.all(tasks);
     } catch (error) {
         showError(error.message);
@@ -490,8 +477,9 @@ function initAuth() {
         const id = params.get('discord_id');
         const username = params.get('username');
         const avatar = params.get('avatar');
-        if (id && username) {
-            localStorage.setItem('discord_user', JSON.stringify({ id, username, avatar }));
+        const token = params.get('token');
+        if (id && username && token) {
+            localStorage.setItem('discord_user', JSON.stringify({ id, username, avatar, token }));
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }
     }
@@ -504,6 +492,8 @@ function initAuth() {
     const stored = localStorage.getItem('discord_user');
     if (stored) {
         try { currentUser = JSON.parse(stored); } catch (e) { localStorage.removeItem('discord_user'); }
+        // logins from before the move to Cloudflare have no token: ask for a fresh login
+        if (currentUser && !currentUser.token) { localStorage.removeItem('discord_user'); currentUser = null; }
     }
 }
 
@@ -526,14 +516,15 @@ function initAuthUI() {
 }
 
 $('discord-login-btn').addEventListener('click', triggerDiscordLogin);
-$('logout-btn').addEventListener('click', () => {
+$('logout-btn').addEventListener('click', logout);
+function logout() {
     localStorage.removeItem('discord_user');
     currentUser = null;
     userFavorites = [];
     userVotes = [];
     initAuthUI();
     handleSearch();
-});
+}
 
 function triggerDiscordLogin() {
     const redirectUri = encodeURIComponent(DISCORD_WORKER_CALLBACK);
@@ -541,58 +532,56 @@ function triggerDiscordLogin() {
 }
 
 // =====================
-// SUPABASE PRESENCE
+// ONLINE COUNTER (WebSocket to the worker)
 // =====================
 function initPresence() {
     const counter = document.querySelector('.online-counter');
-    try {
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const userId = currentUser
-            ? 'discord_' + currentUser.id
-            : (() => {
-                let id = localStorage.getItem('archipelago_user_id');
-                if (!id) {
-                    id = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-                    localStorage.setItem('archipelago_user_id', id);
-                }
-                return id;
-            })();
-
-        const channel = supabase.channel('online-users', {
-            config: { presence: { key: userId } }
-        });
-        channel.on('presence', { event: 'sync' }, () => {
-            $('onlineCount').textContent = Object.keys(channel.presenceState()).length;
-        });
-        channel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') await channel.track({ online_at: Date.now() });
-        });
-    } catch (e) {
-        console.warn('Supabase presence not available:', e.message);
-        counter.style.display = 'none';
+    if (!('WebSocket' in window)) { counter.style.display = 'none'; return; }
+    let id = currentUser ? 'discord_' + currentUser.id : localStorage.getItem('archipelago_user_id');
+    if (!id) {
+        id = 'user_' + Math.random().toString(36).slice(2, 11) + '_' + Date.now();
+        localStorage.setItem('archipelago_user_id', id);
     }
+    let retry = 1000, ping = 0;
+    const connect = () => {
+        const ws = new WebSocket(WORKER_URL.replace(/^http/, 'ws') + '/presence?id=' + encodeURIComponent(id));
+        ws.onopen = () => { retry = 1000; ping = setInterval(() => ws.readyState === 1 && ws.send('ping'), 45000); };
+        ws.onmessage = (e) => {
+            if (e.data === 'pong') return;
+            try { $('onlineCount').textContent = JSON.parse(e.data).online; } catch (err) { /* ignore */ }
+        };
+        ws.onclose = () => { clearInterval(ping); setTimeout(connect, retry); retry = Math.min(retry * 2, 60000); };
+    };
+    connect();
 }
 
 // =====================
-// FIRESTORE HELPERS
+// FAVORITES / VOTES (worker + D1)
 // =====================
 function gameKey(name) {
-    return name.replace(/[./\[\]*~]/g, '_');
+    return name;
+}
+
+async function api(path, options = {}) {
+    const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}) };
+    if (currentUser) headers.Authorization = 'Bearer ' + currentUser.token;
+    const res = await fetch(WORKER_URL + path, { ...options, headers });
+    if (res.status === 401 && currentUser) { logout(); askLogin(); throw new Error('unauthorized'); }
+    if (!res.ok) throw new Error(`${path} → ${res.status}`);
+    return res.json();
 }
 
 async function loadVoteCounts() {
     try {
-        const snap = await db.collection('meta').doc('voteCounts').get();
-        if (snap.exists) voteCounts = snap.data().counts || {};
+        voteCounts = (await api('/api/votes')).counts || {};
     } catch (e) {
         console.warn('Failed to load vote counts:', e.message);
     }
 }
 
-async function loadUserData(discordId) {
+async function loadUserData() {
     try {
-        const snap = await db.collection('users').doc(discordId).get();
-        const data = snap.exists ? snap.data() : {};
+        const data = await api('/api/me');
         userFavorites = data.favorites || [];
         userVotes = data.votes || [];
     } catch (e) {
@@ -627,11 +616,7 @@ async function toggleFavorite(gameName) {
     syncModalActions();
 
     try {
-        await db.collection('users').doc(currentUser.id).set({
-            favorites: isFav
-                ? firebase.firestore.FieldValue.arrayRemove(gameName)
-                : firebase.firestore.FieldValue.arrayUnion(gameName)
-        }, { merge: true });
+        await api('/api/toggle', { method: 'POST', body: JSON.stringify({ kind: 'favorite', game: gameName, on: !isFav }) });
     } catch (e) {
         console.warn('Failed to save favorite:', e.message);
     }
@@ -641,39 +626,18 @@ async function toggleVote(gameName) {
     if (!currentUser) return;
     const hasVoted = userVotes.includes(gameName);
     const key = gameKey(gameName);
-    const delta = hasVoted ? -1 : 1;
 
     userVotes = hasVoted ? userVotes.filter(n => n !== gameName) : [...userVotes, gameName];
-    voteCounts[key] = Math.max(0, (voteCounts[key] || 0) + delta);
+    voteCounts[key] = Math.max(0, (voteCounts[key] || 0) + (hasVoted ? -1 : 1));
 
     if (sortSelect.value === 'votes') handleSearch();
     else updateCard(gameName);
     syncModalActions();
 
     try {
-        const userRef = db.collection('users').doc(currentUser.id);
-        const voteRef = db.collection('meta').doc('voteCounts');
-        await Promise.all([
-            userRef.set({
-                votes: hasVoted
-                    ? firebase.firestore.FieldValue.arrayRemove(gameName)
-                    : firebase.firestore.FieldValue.arrayUnion(gameName)
-            }, { merge: true }),
-            updateVoteCountDoc(voteRef, key, delta)
-        ]);
+        const { count } = await api('/api/toggle', { method: 'POST', body: JSON.stringify({ kind: 'vote', game: gameName, on: !hasVoted }) });
+        if (typeof count === 'number' && count !== voteCounts[key]) { voteCounts[key] = count; updateCard(gameName); }
     } catch (e) {
         console.warn('Failed to save vote:', e.message);
-    }
-}
-
-async function updateVoteCountDoc(voteRef, key, delta) {
-    try {
-        await voteRef.update({ [`counts.${key}`]: firebase.firestore.FieldValue.increment(delta) });
-    } catch (e) {
-        if (e.code === 'not-found') {
-            await voteRef.set({ counts: { [key]: Math.max(0, delta) } });
-        } else {
-            throw e;
-        }
     }
 }

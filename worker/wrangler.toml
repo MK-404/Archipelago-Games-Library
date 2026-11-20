@@ -1,0 +1,21 @@
+# Cloudflare worker: Discord login, favorites/votes (D1) and the online counter (Durable Object).
+# Deploy from this folder with `npx wrangler deploy`. Plain vars set in the dashboard
+# (SITE_URL, DISCORD_CLIENT_ID) are kept; secrets (DISCORD_CLIENT_SECRET, TOKEN_SECRET) live in Cloudflare.
+name = "archipelago-games-library-auth"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+keep_vars = true
+preview_urls = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "archipelago-library"
+database_id = "41a5f2ba-55b0-46c6-8578-d595053bb16c"
+
+[[durable_objects.bindings]]
+name = "PRESENCE"
+class_name = "Presence"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Presence"]

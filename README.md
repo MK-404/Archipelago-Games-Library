@@ -38,6 +38,8 @@ npm run build   # downloads the spreadsheet and builds data/games.json
 npm run serve   # http://localhost:8080
 ```
 
+Login, favorites, votes and the online counter run on a Cloudflare worker (`worker/`). To try them locally, run `npx wrangler dev` inside `worker/` next to `npm run serve`.
+
 The build works without API keys. With `STEAMGRIDDB_API_KEY` it also downloads covers for new games, and with `GOOGLE_SHEETS_API_KEY` it can read cells that contain more than one link.
 
 ## Credits
