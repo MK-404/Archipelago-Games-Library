@@ -8,8 +8,9 @@ body:
       value: |
         Thanks for helping! Once the image is approved it goes live on the site automatically.
 
-        **Cover:** vertical, 2:3 ratio (ideally 600×900).
-        **Banner:** horizontal, wide (ideally 1920×620).
+        <img src="https://archipelagolibrary.com/assets/artwork-guide.png" width="380" alt="Cover: vertical 2:3, 600×900 (min 400×600). Banner: wide, about 3:1, 1920×620 (min 1280×420). Other shapes get cropped from the centre.">
+
+        Other shapes get cropped from the centre, so keep logos and characters away from the edges. Please send sharp originals: no upscaled or blurry images, no watermarks.
         PNG, JPG or WEBP, max 5 MB. Drag the image into the box below, or paste a direct link to the image (for example from SteamGridDB: right click on the image → Copy image address).
   - type: input
     id: name
@@ -31,12 +32,12 @@ body:
     id: cover
     attributes:
       label: Cover
-      description: Drop the cover image here (leave empty if you're only sending a banner)
+      description: "Vertical 2:3, ideally 600×900. Drop the image here (leave empty if you're only sending a banner)"
   - type: textarea
     id: banner
     attributes:
       label: Banner
-      description: Drop the banner image here (leave empty if you're only sending a cover)
+      description: "Wide, about 3:1, ideally 1920×620. Drop the image here (leave empty if you're only sending a cover)"
   - type: input
     id: credit
     attributes:

@@ -28,6 +28,10 @@ The data comes from the [Archipelago games spreadsheet](https://docs.google.com/
 
 Open the game on the site and click **Suggest a better cover or banner**. It opens an issue where you can drop the image. Once it's approved it goes live automatically.
 
+Covers are vertical 2:3 (600×900 is ideal), banners are wide, about 3:1 (1920×620 is ideal). Other shapes get cropped from the centre, and blurry or upscaled images won't be accepted.
+
+<img src="assets/artwork-guide.png" width="380" alt="Cover and banner sizes">
+
 Anything else wrong with a game (status, links, name) should be fixed in the spreadsheet, not here.
 
 ## Running it locally
