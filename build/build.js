@@ -271,9 +271,14 @@ function extractCellLinks(cell) {
     return { text, links };
 }
 
+// Games/tools we never list, even if they're in the spreadsheet (see build/blocked.json)
+const normName = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const BLOCKED = new Set(require('./blocked.json').map((b) => normName(b.name)));
+
 // Check if a row is an instruction/header row (skip it)
 function isInstructionRow(name) {
     if (!name || name.length <= 1) return true;
+    if (BLOCKED.has(normName(name))) return true;
     const lower = name.toLowerCase();
     // Skip header
     if (lower === 'game') return true;
